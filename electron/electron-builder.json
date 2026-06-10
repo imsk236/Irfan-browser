@@ -1,0 +1,28 @@
+{
+  "appId": "com.irfan.manuscript-archive",
+  "productName": "أرشيف إرفان للمخطوطات",
+  "directories": {
+    "buildResources": "resources",
+    "output": "out"
+  },
+  "files": [
+    "dist/**",
+    "resources/**",
+    "!node_modules/**"
+  ],
+  "extraResources": [
+    {
+      "from": "resources/backend.exe",
+      "to": "backend.exe"
+    }
+  ],
+  "win": {
+    "target": "nsis",
+    "icon": "resources/icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "installerLanguages": ["ar"]
+  }
+}

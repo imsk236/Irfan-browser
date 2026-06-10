@@ -1,0 +1,17 @@
+{
+  "name": "irfan-electron",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs && node launch.mjs",
+    "start": "node launch.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.8.0"
+  }
+}

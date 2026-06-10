@@ -1,0 +1,31 @@
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist-python/
+
+# Build artifacts
+electron/out/
+electron/dist/
+frontend/dist/
+
+# Database (user data — never commit)
+*.db
+*.db-wal
+*.db-shm
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

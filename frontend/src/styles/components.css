@@ -1,0 +1,210 @@
+/* =========================================================
+   Shared component styles — applied globally as base classes
+   ========================================================= */
+
+/* ----- Buttons ----- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+.btn-primary:hover { background: #2a3e1c; }
+.btn-primary:active { background: #1e2e14; }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-text);
+  border: var(--border);
+}
+.btn-secondary:hover { background: var(--color-hover-bg); }
+
+.btn-danger {
+  background: transparent;
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+.btn-danger:hover { background: #fdf0ee; }
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ----- Inputs ----- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field label {
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: var(--font-size-body);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast), outline var(--transition-fast);
+  outline: none;
+  direction: rtl;
+  text-align: right;
+}
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: var(--color-focus-outline);
+  outline: 2px solid var(--color-focus-outline);
+  outline-offset: 1px;
+}
+.input:disabled,
+.textarea:disabled,
+.select:disabled {
+  background: var(--color-bg);
+  color: var(--color-disabled-text);
+}
+
+.textarea { resize: vertical; min-height: 80px; }
+
+/* ----- Tables ----- */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-label);
+}
+.data-table th,
+.data-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: right;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+.data-table th {
+  font-weight: 600;
+  color: var(--color-info);
+  background: var(--color-bg);
+}
+.data-table tr:hover td { background: var(--color-hover-bg); }
+.data-table tr.selected td { background: var(--color-selected-bg); }
+
+/* ----- Cards (summaries / grouped results only) ----- */
+.card {
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+/* ----- Section divider ----- */
+.section-heading {
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--color-info);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border);
+  margin-bottom: var(--space-4);
+}
+
+/* ----- Confidence tag ----- */
+.confidence {
+  font-size: 12px;
+  color: var(--color-info);
+}
+.confidence.confirmed { color: var(--color-highlight); }
+.confidence.probable  { color: var(--color-warning); }
+.confidence.possible  { color: var(--color-info); }
+
+/* ----- Serial badge ----- */
+.serial-badge {
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  font-size: var(--font-size-label);
+  background: var(--color-bg);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: 2px var(--space-2);
+  display: inline-block;
+}
+
+/* ----- Empty state ----- */
+.empty-state {
+  text-align: center;
+  padding: var(--space-7) var(--space-5);
+  color: var(--color-info);
+  font-size: var(--font-size-label);
+}
+
+/* ----- Side panel overlay ----- */
+.side-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  z-index: 100;
+}
+.side-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 420px;
+  max-width: 90vw;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+  z-index: 101;
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+
+/* ----- Inline match dropdown ----- */
+.match-dropdown {
+  position: absolute;
+  z-index: 50;
+  width: 100%;
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-dropdown);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.match-item {
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  font-size: var(--font-size-label);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid var(--color-border);
+}
+.match-item:last-child { border-bottom: none; }
+.match-item:hover { background: var(--color-hover-bg); }
+.match-item.create-new {
+  color: var(--color-primary);
+  font-weight: 500;
+  font-size: 13px;
+}
+.match-item-name { font-weight: 500; }
+.match-item-hint { font-size: 12px; color: var(--color-info); }
