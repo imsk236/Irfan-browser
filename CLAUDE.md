@@ -122,6 +122,51 @@ def test_something(client, session):
     # session = SQLAlchemy session, rolls back after test
 ```
 
+## Git workflow
+
+### When to commit
+
+Commit after each self-contained unit of work — not after every file save, and not only at the end of a session. Good commit points:
+
+- A migration + its matching model/schema/service changes all pass tests
+- A new screen or component is wired up end-to-end and visually correct
+- A bug is fixed and the fix is verified
+- A documentation update is complete
+- A prototype milestone is reached (e.g. "prototype 2 complete")
+
+Do **not** wait until "everything is done" — small, focused commits make it easy to bisect regressions and roll back individual changes without losing unrelated work.
+
+### How to commit
+
+Always run backend tests before committing backend changes:
+
+```bash
+cd backend && uv run pytest
+```
+
+Stage specific files rather than `git add .` to avoid accidentally committing `dev_archive.db`, `.env`, or screenshot dumps:
+
+```bash
+git add backend/src/... frontend/src/... docs/...
+git commit -m "feat: describe what changed and why"
+```
+
+Commit message conventions:
+
+| Prefix | Use |
+|---|---|
+| `feat:` | new feature or screen |
+| `fix:` | bug fix |
+| `refactor:` | code restructure with no behavior change |
+| `test:` | adding or updating tests |
+| `docs:` | documentation only |
+| `migration:` | schema migration (pair with the model change in the same commit) |
+| `chore:` | dependency updates, config, tooling |
+
+Never commit: `dev_archive.db`, `archive.db`, `Tempshots/`, `.env`, `node_modules/`, `__pycache__/`, build output.
+
+---
+
 ## Key domain concepts
 
 - **Witness vs interpretation** — `*_as_written` fields are verbatim transcriptions (immutable evidence). Normalized/interpreted fields carry a confidence level.
