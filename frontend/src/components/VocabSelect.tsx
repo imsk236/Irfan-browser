@@ -13,9 +13,21 @@ interface Props {
 
 export function VocabSelect({ category, value, onChange, placeholder, required, disabled, id }: Props) {
   const [options, setOptions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    vocabApi.list(category).then(setOptions).catch(() => setOptions([]));
+    async function load() {
+      setLoading(true);
+      try {
+        const opts = await vocabApi.list(category);
+        setOptions(opts);
+      } catch {
+        setOptions([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    void load();
   }, [category]);
 
   return (
@@ -25,12 +37,18 @@ export function VocabSelect({ category, value, onChange, placeholder, required, 
       value={value}
       onChange={(e) => onChange(e.target.value)}
       required={required}
-      disabled={disabled}
+      disabled={disabled || loading}
+      aria-busy={loading}
     >
-      {placeholder && <option value="">{placeholder}</option>}
-      {options.map((opt) => (
-        <option key={opt} value={opt}>{opt}</option>
-      ))}
+      {loading
+        ? <option value="">جارٍ التحميل…</option>
+        : <>
+            {placeholder && <option value="">{placeholder}</option>}
+            {options.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </>
+      }
     </select>
   );
 }

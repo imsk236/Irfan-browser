@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from ..db.models import PersonRelationship, Annotation, Work
+from .errors import ResourceNotFoundError
+from .vocab import validate_value
 
 _AUTHOR_ROLE = "مؤلف"
 
@@ -16,21 +18,17 @@ def _validate_evidence_annotation(
         return
     annotation = session.get(Annotation, evidence_annotation_id)
     if not annotation:
-        raise ValueError(f"Annotation {evidence_annotation_id} not found")
+        raise ValueError("التقييد المشار إليه كدليل غير موجود")
 
     if work_id is not None:
         work = session.get(Work, work_id)
         if not work:
-            raise ValueError(f"Work {work_id} not found")
+            raise ValueError("الأثر المشار إليه غير موجود")
         if annotation.volume_id != work.volume_id:
-            raise ValueError(
-                "الدليل المستشهد به لا ينتمي إلى المجلد الصحيح"
-            )
+            raise ValueError("الدليل المستشهد به لا ينتمي إلى المجلد الصحيح")
     elif volume_id is not None:
         if annotation.volume_id != volume_id:
-            raise ValueError(
-                "الدليل المستشهد به لا ينتمي إلى هذه المجلد"
-            )
+            raise ValueError("الدليل المستشهد به لا ينتمي إلى هذه المجلد")
 
 
 def link_person_to_work(
@@ -43,6 +41,9 @@ def link_person_to_work(
     evidence_annotation_id: int | None = None,
     notes: str | None = None,
 ) -> PersonRelationship:
+    validate_value(session, "role", role)
+    validate_value(session, "confidence", confidence)
+    validate_value(session, "knowledge_source", evidence_source)
     _validate_evidence_annotation(session, evidence_annotation_id, None, work_id)
 
     if role == _AUTHOR_ROLE:
@@ -84,6 +85,9 @@ def link_person_to_volume(
     evidence_annotation_id: int | None = None,
     notes: str | None = None,
 ) -> PersonRelationship:
+    validate_value(session, "role", role)
+    validate_value(session, "confidence", confidence)
+    validate_value(session, "knowledge_source", evidence_source)
     _validate_evidence_annotation(session, evidence_annotation_id, volume_id, None)
 
     rel = PersonRelationship(
@@ -105,6 +109,7 @@ def link_person_to_volume(
 
 def delete_relationship(session: Session, relationship_id: int) -> None:
     rel = session.get(PersonRelationship, relationship_id)
-    if rel:
-        session.delete(rel)
-        session.commit()
+    if not rel:
+        raise ResourceNotFoundError("الربط غير موجود")
+    session.delete(rel)
+    session.commit()

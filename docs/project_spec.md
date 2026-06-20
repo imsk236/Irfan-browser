@@ -72,9 +72,9 @@ PPPP-DDDD          e.g.  0001-0448
 ```
 
 - `place_key` is assigned once per repository.
-- `document_number` is a **per-repository running count the researcher controls** (not the library's shelfmark). Assigned as `MAX(document_number) for that repository + 1` at volume creation. To avoid duplicate assignment under accidental double-open or sync conflict, do this inside a transaction (`BEGIN IMMEDIATE` … `SELECT COALESCE(MAX(document_number),0)+1` … `INSERT` … `COMMIT`). The library's own shelfmark is stored separately as informational text.
+- `document_number` is a **per-repository running count assigned automatically by the system** (not the library's shelfmark and not user-editable in the UI). Assigned as `MAX(document_number) for that repository + 1` at volume creation. To avoid duplicate assignment under accidental double-open or sync conflict, do this inside a transaction (`BEGIN IMMEDIATE` … `SELECT COALESCE(MAX(document_number),0)+1` … `INSERT` … `COMMIT`). The library's own shelfmark is stored separately as informational text.
 - The serial is globally unique (enforced by a unique constraint on `volumes.serial`). The `UNIQUE(repository_id, document_number)` constraint is the final protection on the running count.
-- **Serial editing policy (resolved):** `place_key`, `document_number`, and `serial` must never disagree. The researcher edits the components (repository and document number); the serial is then **regenerated automatically** from them. The serial is never hand-typed into a state that contradicts its parts.
+- **Serial editing policy (resolved):** `place_key`, `document_number`, and `serial` must never disagree. The researcher may change the **repository** (which changes the `place_key` component and regenerates the serial); `document_number` is system-assigned and not exposed as an editable field. The serial is never hand-typed into a state that contradicts its parts.
 
 ---
 
@@ -106,13 +106,27 @@ CREATE TABLE volumes (
 
 -- الأشخاص (standard, normalized person record)
 CREATE TABLE persons (
-  id             INTEGER PRIMARY KEY,
-  preferred_name TEXT NOT NULL,                -- required display name; allows fast "name only" create
-  ism            TEXT,                            -- given name, e.g. محمد
-  nisba_1        TEXT,
-  nisba_2        TEXT,
-  laqab          TEXT,                            -- optional. NOTE: kunya field intentionally removed
-  notes          TEXT
+  id                    INTEGER PRIMARY KEY,
+  preferred_name        TEXT NOT NULL,              -- الاسم المعتمد؛ الحقل الوحيد المطلوب
+  identification_status TEXT,                       -- vocab person_identification_status
+  ism                   TEXT,
+  kunya                 TEXT,
+  laqab                 TEXT,
+  nisba_1               TEXT,
+  nisba_2               TEXT,
+  known_as              TEXT,                       -- الشهرة أو المعروف به
+  birth_date_as_written TEXT,
+  birth_year_earliest   INTEGER,
+  birth_year_latest     INTEGER,
+  death_date_as_written TEXT,
+  death_year_earliest   INTEGER,
+  death_year_latest     INTEGER,
+  birth_place           TEXT,
+  death_place           TEXT,
+  region_or_country     TEXT,
+  scholarly_affiliation TEXT,
+  occupation_or_status  TEXT,
+  notes                 TEXT
 );
 -- preferred_name carries names that resist clean splitting, e.g. أبو محمد المعروف بابن النظر.
 -- Structured fields (ism, nisba, laqab) stay optional and can be filled in later.
@@ -210,6 +224,7 @@ Store in a single `vocab(category, value, sort_order)` table or one table per ca
 - `annotation_type`: تملك، وقف، إهداء، ولادة، وفاة
 - `date_precision`: يوم، شهر، سنة، عقد، قرن، مجهول
 - `repository_kind`: مؤسسة، مكتبة شخصية
+- `person_identification_status`: معروف، غير مكتمل التعريف، مجهول، يحتاج إلى مراجعة
 
 All categories must be admin-extendable (researcher can add new values later). **Vocabulary values that are already in use must never be physically deleted.** Carry an `is_active` flag instead: an inactive value stays valid for existing records but disappears from new-entry dropdowns. (Values remain stored by value as above; an ID-based vocabulary is deliberately out of scope to keep the prototype simple.)
 
@@ -217,36 +232,169 @@ All categories must be admin-extendable (researcher can add new values later). *
 
 ## 7. UX requirements
 
-RTL Arabic everywhere. Four primary screens: (1) catalog a volume + its works, (2) record annotations, (3) manage person records, (4) trace-a-scholar search.
+RTL Arabic everywhere. Person identity and manuscript relationships must be treated as separate concerns.
 
-### 7.1 Person entry is role-first (critical)
+### 7.1 Person identity is independent from manuscript relationships
 
-The storage model attaches people to works/volumes through a `person_relationships` row carrying a role. **The UI must never expose this as "add a person, then pick a role."** Instead the screen asks the role-appropriate question in plain language, and the role is set silently from context:
+A person record describes the person as a normalized identity in the archive. It must not contain a permanent field for the person's relationship to a manuscript.
 
-- On a work: **"who is the author?"** → writes a relationship with `role = مؤلف`.
-- On a copy/scribe note: **"who copied this?"** → `role = ناسخ`.
-- On a `تملك` annotation: **"who owned it?"** → `role = مالك`.
-- …and so on per role/context.
+The create/edit person screen must not contain fields such as:
 
-The cataloger answers a natural question; the role, level, and FK wiring happen behind the scenes.
+- علاقته بالمخطوط
+- الدور
+- الصفة في المخطوط
+- المجلد المرتبط
+- العنوان المرتبط
+- القيد المرتبط
 
-### 7.2 Inline person matching (the integrity guard)
+These relationships are created only from the relevant cataloging context:
 
-In every person field above, as the user types, show existing `persons` ranked by match against their `person_name_variants` and standard name. This prevents creating a duplicate person record, which would silently split a scholar's scripts and corrupt the trace result.
+- While entering a title, ask for the author, scribe, additional scribe, copy recipient, and other title-level roles.
+- While entering an annotation, ask for the annotation writer and connected or mentioned persons.
+- When a relationship applies to the whole volume, create it from the volume page.
 
-Matching must be **Arabic-tolerant**: normalize before comparing — unify hamza forms, alef variants (أ/إ/آ/ا), taa marbuta vs haa (ة/ه), yaa/alef-maqsura (ي/ى), strip diacritics and tatweel. Store this as the `normalized_form` search key, but **normalization is for search and ranking only; it never replaces the written form** and the system never auto-merges two people on a fuzzy score. The user always chooses the identity.
+The application derives the correct `person_relationships` row from the screen context. A person may hold different roles in different records, so no manuscript role is a permanent attribute of the person.
 
-Run candidates through a staged pipeline, strongest signal first: exact match on the written form, then exact match on the normalized form, then prefix match, then token match, then fuzzy similarity, and finally manual confirmation. Folding ة→ه and ى→ي widens the candidate net but can also pull in genuinely different names, which is exactly why the final identity decision stays with the researcher.
+### 7.2 Person card
 
-When the user selects an existing match, link to it (and optionally store the freshly typed spelling as a new `person_name_variant`). When they confirm none match, create a new person inline.
+The create/edit person screen must be presented as one structured person card divided into logical sections. It must not be a long collection of unrelated fields spread across the page.
 
-### 7.3 Person record richness is optional
+Most fields are optional. The researcher must be able to save a person using only the preferred name and enrich the record later.
 
-A person may be as thin as one name or as rich as full nasab + nisbas + laqab. Entry must allow a fast "name only" create now, enrich later. Do not force structured fields at creation time.
+#### 7.2.1 Basic identity
 
-### 7.4 Mentioned persons (`مذكور`)
+Always visible:
 
-A single annotation may name several non-party people. Allow the cataloger, while entering the annotation, to attach mentioned persons to the note; each creates a `person_relationships` row with `role = مذكور` and `evidence_annotation_id` set to that annotation. (See open question 9.3 on inline-vs-stepwise; default to attaching within the annotation form.)
+- **الاسم المعتمد** — required; the main display and search name.
+- **حالة التعريف** — optional controlled vocabulary: معروف، غير مكتمل التعريف، مجهول، يحتاج إلى مراجعة.
+
+The preferred name may be entered as one complete string. Structured fields are never required for initial creation.
+
+#### 7.2.2 Structured name details
+
+Optional and collapsed by default:
+
+- الاسم الشخصي
+- سلسلة النسب of flexible depth
+- الكنية
+- اللقب
+- النسبة الأولى
+- النسبة الثانية
+- الشهرة أو المعروف به
+
+The nasab chain uses repeatable rows so the researcher may add as many ancestors as needed. Structured fields must not automatically overwrite the preferred name.
+
+#### 7.2.3 Name variants
+
+A person may have any number of witnessed name forms. Each variant stores:
+
+- the form exactly as written;
+- an optional note;
+- its source annotation when available.
+
+Variants belong to the same normalized person and must not create separate person records. The system must never auto-merge people based only on similarity.
+
+#### 7.2.4 Additional identifying information
+
+Optional and collapsed by default:
+
+- birth date or approximate birth range;
+- death date or approximate death range;
+- birth place;
+- death place;
+- region or country;
+- scholarly affiliation or school, when the researcher chooses to record it;
+- occupation, scholarly status, or another identifying description.
+
+None of these fields is required to create a person.
+
+#### 7.2.5 Notes
+
+A free-text area for identification hypotheses, possible confusion with other persons, lineage comments, source disagreements, and matters requiring later review.
+
+### 7.3 Fast person creation
+
+The system must support a fast name-only flow:
+
+1. The researcher types a name in a person field.
+2. Existing candidates are shown before creation.
+3. The researcher selects an existing person or confirms that none match.
+4. A new person may be saved with only `preferred_name`.
+5. Optional person-card sections may be completed immediately or later.
+
+The candidate panel must appear before the final create action to reduce duplicate identities.
+
+### 7.4 Inline Arabic-tolerant matching
+
+In every person field, show existing persons ranked against both the preferred name and recorded name variants.
+
+Normalize for search by unifying hamza and alef forms, folding taa marbuta/haa and yaa/alef-maqsura where appropriate, and removing diacritics and tatweel. Normalization is only a search and ranking aid; it never replaces the witnessed form and never causes an automatic merge.
+
+Rank candidates in stages: exact written-form match, exact normalized match, prefix match, token match, fuzzy similarity, then manual confirmation. The researcher always makes the final identity decision.
+
+When an existing person is selected, the newly typed manuscript spelling may be stored as a new `person_name_variant` with its evidence source.
+
+### 7.5 Role-first questions during cataloging
+
+Person relationships are entered naturally from the manuscript context. The UI asks role-specific questions rather than exposing raw relationship-table fields.
+
+Examples:
+
+- **من المؤلف؟** → `role = مؤلف`
+- **من نسخ هذا العنوان؟** → `role = ناسخ`
+- **لمن نُسخ؟** → `role = منسوخ له`
+- **من كتب القيد؟** → `role = كاتب قيد`
+- **من المالك؟** → `role = مالك`
+- **من الأشخاص المذكورون أو المتصلون بالقيد؟** → one or more contextual relationships
+
+The role, relationship level, and foreign-key wiring are derived from the screen and question context.
+
+### 7.6 Person profile and archive appearances
+
+After a person is saved, the person profile may show a read-only section titled **مواضع ظهور الشخص في الأرشيف**.
+
+This section aggregates relationships created from volume, title, and annotation entry. It is not the primary place for creating those relationships.
+
+Each result should show:
+
+- role;
+- volume serial;
+- title name when applicable;
+- annotation type or number when applicable;
+- confidence;
+- evidence source;
+- a control to open the original record.
+
+### 7.7 Mentioned and connected persons
+
+A single annotation may contain several connected or merely mentioned persons. The annotation form must allow adding multiple people. Each selected person creates a separate relationship linked to that annotation, with the role appropriate to the context, such as `مذكور`, `بائع`, `مشترٍ`, or another controlled role.
+
+### 7.8 Person-card layout
+
+```text
+شخص جديد
+
+┌──────────────────────────────────────────────┐
+│ الهوية الأساسية                             │
+│ الاسم المعتمد *                              │
+│ [                                           ]│
+│ حالة التعريف                                 │
+│ [اختر الحالة]                                │
+├──────────────────────────────────────────────┤
+│ تفاصيل الاسم                         [فتح]   │
+├──────────────────────────────────────────────┤
+│ صيغ الأسماء                          [+ إضافة]│
+├──────────────────────────────────────────────┤
+│ معلومات تعريفية إضافية               [فتح]   │
+├──────────────────────────────────────────────┤
+│ ملاحظات                                     │
+│ [                                           ]│
+└──────────────────────────────────────────────┘
+
+[إلغاء] [حفظ الشخص]
+```
+
+Advanced sections are collapsed by default. The basic identity remains visible. The card should occupy a focused, readable content column and avoid excessive empty space.
 
 ---
 
@@ -272,7 +420,7 @@ These were not finalized in design. Implement the stated default and surface the
 1. **Data source vs holding place.** Current model assumes the place that holds the manuscript == the place the images came from (one `repository_id` on `volumes`). If these can differ, add `source_repository_id` to `volumes`. **Default:** single repository link.
 2. **New-person creation flow.** **Default:** inline creation, but the matches panel is shown first so the user sees existing candidates before a new record is made.
 3. **`مذكور` tagging flow.** **Default:** tag mentioned persons within the annotation entry form (not a separate later step).
-4. **Serial editability.** Resolved: linking uses surrogate keys, so serials are safe to change. The chosen policy is edit-the-components-and-regenerate: the researcher edits repository/document number and the serial is rebuilt from them, so the three fields can never contradict. Confirm this matches the researcher's expectation.
+4. **Serial editability.** Resolved: linking uses surrogate keys, so serials are safe to change. The chosen policy is edit-the-components-and-regenerate: the researcher may change the **repository** (the `place_key` component) and the serial regenerates automatically. `document_number` is system-assigned at creation and is not exposed for editing — the numeric suffix of the serial is therefore fixed once assigned.
 5. **Photo access across two machines** is a deployment concern, not a schema one: images stay external; only `image_location` strings are in the DB. How the two machines reach the image files is left to the user's storage setup.
 
 ---

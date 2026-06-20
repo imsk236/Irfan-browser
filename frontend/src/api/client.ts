@@ -1,4 +1,4 @@
-let _baseUrl = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8765";
+let _baseUrl = import.meta.env.VITE_BACKEND_URL ?? "http://127.0.0.1:8765";
 
 export function setBaseUrl(url: string) {
   _baseUrl = url;
@@ -24,7 +24,9 @@ async function request<T>(
     try {
       const err = await res.json();
       detail = err.detail ?? detail;
-    } catch {}
+    } catch {
+      // JSON body unavailable — fall back to HTTP status text
+    }
     throw new Error(detail);
   }
 

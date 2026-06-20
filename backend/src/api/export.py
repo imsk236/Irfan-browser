@@ -1,6 +1,5 @@
 import os
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from ..db.engine import get_session
 from ..services import export as svc
@@ -17,8 +16,10 @@ def export_csv(body: ExportRequest):
     try:
         files = svc.export_csv(body.output_dir)
         return {"files": files}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="فشل التصدير. تحقق من المسار والصلاحيات.")
 
 
 @router.post("/json")
@@ -27,5 +28,7 @@ def export_json(body: ExportRequest):
     try:
         path = svc.export_json(output_path)
         return {"file": path}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="فشل التصدير. تحقق من المسار والصلاحيات.")

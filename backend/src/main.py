@@ -3,6 +3,7 @@
 Prints the bound port to stdout so the Electron main process can read it.
 """
 import argparse
+import asyncio
 import os
 import socket
 import sys
@@ -30,6 +31,25 @@ async def lifespan(app: FastAPI):
     yield
 
 
+def _arabic_integrity_detail(exc: IntegrityError) -> str:
+    """Map known SQLite constraint names to Arabic user-facing messages."""
+    orig = str(exc.orig) if exc.orig else ""
+
+    if "repositories.place_key" in orig:
+        return "مفتاح المستودع مستخدم بالفعل. اختر مفتاحاً مختلفاً."
+    if "volumes.serial" in orig:
+        return "الرقم التسلسلي مكرر. لا يمكن إنشاء وثيقتين بالرقم نفسه."
+    if "volumes.repository_id" in orig and "document_number" in orig:
+        return "رقم الوثيقة مستخدم بالفعل في هذا المستودع."
+    if "person_name_variants" in orig and "written_form" in orig:
+        return "هذه التهجئة مسجلة بالفعل لهذا الشخص."
+    if "vocab" in orig and ("category" in orig or "value" in orig):
+        return "هذه القيمة موجودة بالفعل في القائمة."
+    if "FOREIGN KEY" in orig:
+        return "مرجع غير صالح: السجل المرتبط غير موجود."
+    return "تعارض في البيانات"
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Omani Manuscript Archive API", docs_url="/docs", lifespan=lifespan)
 
@@ -51,8 +71,10 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(IntegrityError)
     async def integrity_error_handler(_request: Request, exc: IntegrityError) -> JSONResponse:
-        detail = str(exc.orig) if exc.orig else "تعارض في البيانات"
-        return JSONResponse(status_code=409, content={"detail": detail})
+        return JSONResponse(
+            status_code=409,
+            content={"detail": _arabic_integrity_detail(exc)},
+        )
 
     return app
 
@@ -87,9 +109,19 @@ def main():
         sys.exit(1)
 
     port = args.port if args.port != 0 else find_free_port()
-    print(f"BACKEND_PORT={port}", flush=True)
 
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    async def _serve() -> None:
+        config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+        server = uvicorn.Server(config)
+
+        async def _announce() -> None:
+            while not server.started:
+                await asyncio.sleep(0.05)
+            print(f"BACKEND_PORT={port}", flush=True)
+
+        await asyncio.gather(server.serve(), _announce())
+
+    asyncio.run(_serve())
 
 
 if __name__ == "__main__":

@@ -12,9 +12,11 @@ class TraceResultOut(BaseModel):
     level: str
     confidence: str
     serial: str
+    repository_volume_number: int | None
     work_id: int | None
     work_title: str | None
     evidence_annotation_id: int | None
+    evidence_annotation_type: str | None
     evidence_text: str | None
     evidence_image_location: str | None
     evidence_source: str | None

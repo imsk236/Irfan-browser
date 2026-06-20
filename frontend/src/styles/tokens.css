@@ -1,51 +1,69 @@
 :root {
-  /* Colors */
-  --color-primary: #354e24;
-  --color-highlight: #7e9e36;
-  --color-bg: #f7f5ef;
-  --color-surface: #ffffff;
-  --color-text: #22251f;
-  --color-border: #d9ddd3;
-  --color-error: #9b3d2e;
-  --color-warning: #b5832e;
-  --color-info: #4a5a66;
+  /* ── Color tokens (ui_style_guide §3.1) ── */
+  --color-primary-700: #526B2D;
+  --color-primary-600: #667F3A;
+  --color-primary-100: #F1F4EA;
+  --color-page: #FAF9F5;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #F7F6F2;
+  --color-text: #252720;
+  --color-text-muted: #7D8076;
+  --color-border: #DDDED8;
+  --color-border-strong: #C9CBC3;
+  --color-danger: #9B3D2E;
+  --color-warning: #B5832E;
+  --color-info: #56636A;
 
-  /* Interactive states */
-  --color-hover-bg: #eeecea;
-  --color-focus-outline: #354e24;
-  --color-selected-bg: #edf2e0;
-  --color-selected-marker: #7e9e36;
+  /* Backward-compat aliases used by existing component CSS */
+  --color-primary: var(--color-primary-700);
+  --color-highlight: var(--color-primary-600);
+  --color-bg: var(--color-page);
+  --color-error: var(--color-danger);
+  --color-hover-bg: var(--color-surface-muted);
+  --color-selected-bg: var(--color-primary-100);
+  --color-selected-marker: var(--color-primary-700);
+  --color-focus-outline: var(--color-primary-700);
   --color-disabled-text: #a0a59a;
 
-  /* Spacing (fixed scale) */
+  /* ── Spacing scale (ui_style_guide §3.3) ── */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
-  --space-7: 48px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
 
-  /* Typography */
+  /* ── Typography (ui_style_guide §4.2) ── */
   --font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif;
-  --font-size-title: 28px;
+  --font-size-title: 26px;
+  --font-size-section: 18px;
+  --font-size-panel: 16px;
   --font-size-body: 15px;
   --font-size-label: 14px;
+  --font-size-meta: 13px;
   --line-height-body: 1.75;
 
-  /* Border */
-  --radius: 6px;
-  --border: 1px solid var(--color-border);
+  /* ── Radius tokens (ui_style_guide §3.4) ── */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius: var(--radius-md);
 
-  /* Shadows — only for side panel and unavoidable dropdowns */
+  /* ── Shadows ── */
   --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.10);
   --shadow-dropdown: 0 2px 8px rgba(0, 0, 0, 0.08);
 
-  /* Transitions */
+  /* ── Motion tokens (ui_style_guide §3.5) ── */
   --transition-fast: 120ms ease;
-  --transition-normal: 180ms ease;
+  --transition-standard: 160ms ease;
+  --transition-max: 180ms ease;
+  --transition-normal: var(--transition-max);
 
-  /* Layout */
-  --nav-width: 200px;
+  /* ── Layout ── */
+  --nav-width: 224px;
+  --header-height: 72px;
   --content-max-width: 1280px;
 }

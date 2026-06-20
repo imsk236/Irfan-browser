@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from ..db.engine import get_session
 from ..services import relationships as svc
+from ..services.errors import ResourceNotFoundError
 
 router = APIRouter(prefix="/relationships", tags=["relationships"])
 
@@ -67,6 +68,8 @@ def create_relationship(body: RelationshipCreate):
                 raise HTTPException(status_code=422, detail="level يجب أن يكون 'work' أو 'volume'")
 
             return RelationshipOut.model_validate(rel)
+        except HTTPException:
+            raise
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
 
@@ -76,7 +79,6 @@ def list_relationships_for_volume(volume_id: int):
     from sqlalchemy import select
     from ..db.models import PersonRelationship, Work
     with get_session() as session:
-        # Include direct volume-level + work-level (via works in this volume)
         volume_rels = session.execute(
             select(PersonRelationship).where(
                 PersonRelationship.level == "volume",
@@ -99,4 +101,7 @@ def list_relationships_for_volume(volume_id: int):
 @router.delete("/{relationship_id}", status_code=204)
 def delete_relationship(relationship_id: int):
     with get_session() as session:
-        svc.delete_relationship(session, relationship_id)
+        try:
+            svc.delete_relationship(session, relationship_id)
+        except ResourceNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))

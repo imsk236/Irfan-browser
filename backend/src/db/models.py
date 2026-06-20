@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, Text, Boolean, CheckConstraint, UniqueConstraint,
-    ForeignKey, event
+    ForeignKey,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -27,7 +27,7 @@ class Repository(Base):
     id = Column(Integer, primary_key=True)
     place_key = Column(Text, nullable=False, unique=True)
     name = Column(Text, nullable=False)
-    kind = Column(Text, nullable=False)
+    location = Column(Text)
     notes = Column(Text)
 
     volumes = relationship("Volume", back_populates="repository")
@@ -40,7 +40,7 @@ class Volume(Base):
     repository_id = Column(Integer, ForeignKey("repositories.id"), nullable=False)
     document_number = Column(Integer, nullable=False)
     serial = Column(Text, nullable=False, unique=True)
-    library_shelfmark = Column(Text)
+    repository_volume_number = Column(Integer)
     folio_count = Column(Integer)
     notes = Column(Text)
 
@@ -61,24 +61,33 @@ class Person(Base):
     nisba_1 = Column(Text)
     nisba_2 = Column(Text)
     laqab = Column(Text)
+    nasab = Column(Text)
     notes = Column(Text)
 
-    ancestors = relationship("PersonAncestor", back_populates="person", order_by="PersonAncestor.position")
+    kunya = Column(Text)
+    known_as = Column(Text)
+    birth_date_as_written = Column(Text)
+    birth_year_earliest = Column(Integer)
+    birth_year_latest = Column(Integer)
+    death_date_as_written = Column(Text)
+    death_year_earliest = Column(Integer)
+    death_year_latest = Column(Integer)
+    birth_place = Column(Text)
+    death_place = Column(Text)
+
     name_variants = relationship("PersonNameVariant", back_populates="person")
+    wilayas = relationship("PersonWilaya", back_populates="person")
     relationships = relationship("PersonRelationship", back_populates="person")
 
 
-class PersonAncestor(Base):
-    __tablename__ = "person_ancestors"
+class PersonWilaya(Base):
+    __tablename__ = "person_wilayas"
 
     id = Column(Integer, primary_key=True)
     person_id = Column(Integer, ForeignKey("persons.id"), nullable=False)
-    position = Column(Integer, nullable=False)
-    name = Column(Text, nullable=False)
+    wilaya = Column(Text, nullable=False)
 
-    person = relationship("Person", back_populates="ancestors")
-
-    __table_args__ = (UniqueConstraint("person_id", "position"),)
+    person = relationship("Person", back_populates="wilayas")
 
 
 class PersonNameVariant(Base):
@@ -103,10 +112,17 @@ class Work(Base):
     id = Column(Integer, primary_key=True)
     volume_id = Column(Integer, ForeignKey("volumes.id"), nullable=False)
     title = Column(Text, nullable=False)
-    work_type = Column(Text)
     start_unit = Column(Text)
     end_unit = Column(Text)
     notes = Column(Text)
+
+    # Structured Hijri copy date — all nullable (NULL = مجهول, researcher must explicitly choose)
+    copy_date_as_written = Column(Text)   # verbatim witness from the manuscript
+    copy_year = Column(Integer)
+    copy_month = Column(Text)             # one of the 12 Hijri month names
+    copy_day = Column(Integer)            # 1–30
+    copy_weekday = Column(Text)           # one of the 7 Arabic weekday names
+    copy_time = Column(Text)              # controlled vocab (copy_time category)
 
     volume = relationship("Volume", back_populates="works")
     annotations = relationship("Annotation", back_populates="work")
@@ -121,10 +137,6 @@ class Annotation(Base):
     work_id = Column(Integer, ForeignKey("works.id"))
     annotation_type = Column(Text, nullable=False)
     text_as_written = Column(Text)
-    date_as_written = Column(Text)
-    date_earliest = Column(Integer)
-    date_latest = Column(Integer)
-    date_precision = Column(Text)
     image_location = Column(Text)
     notes = Column(Text)
 

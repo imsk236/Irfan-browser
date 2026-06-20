@@ -1,0 +1,52 @@
+/* Top utility header (ui_style_guide §6) */
+.app-header {
+  height: var(--header-height);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-5);
+  gap: var(--space-5);
+  flex-shrink: 0;
+  direction: rtl;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.header-logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
+.header-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.header-name-ar {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.header-name-en {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+}
+
+.header-center {
+  flex: 1;
+}
+
+.header-end {
+  /* placeholder for future user avatar / utility controls */
+}

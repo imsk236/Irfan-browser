@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from rapidfuzz import process as rf_process, fuzz
-from ..db.models import Person, PersonNameVariant, PersonAncestor
+from ..db.models import Person, PersonNameVariant, PersonWilaya
 from ..utils.arabic import normalize_arabic
+from .errors import ResourceNotFoundError
 
 _FUZZY_SCORE_THRESHOLD = 75
 
@@ -18,10 +19,7 @@ class PersonMatch:
 
 
 def find_candidates(session: Session, query: str, limit: int = 10) -> list[PersonMatch]:
-    """Staged Arabic-tolerant person search. Returns ranked candidates.
-
-    The service never auto-merges — it returns matches for the user to decide.
-    """
+    """Staged Arabic-tolerant person search. Returns ranked candidates."""
     if not query.strip():
         return []
 
@@ -44,29 +42,24 @@ def find_candidates(session: Session, query: str, limit: int = 10) -> list[Perso
         select(PersonNameVariant).join(Person)
     ).scalars().all()
 
-    # Stage 1: exact match on written_form
     for v in all_variants:
         if v.written_form == query:
             add_match(v.person, v.written_form, 100.0, "exact_written")
 
-    # Stage 2: exact match on normalized_form
     for v in all_variants:
         if v.normalized_form and v.normalized_form == normalized_query:
             add_match(v.person, v.written_form, 99.0, "exact_normalized")
 
-    # Also match against preferred_name (normalized)
     all_persons = session.execute(select(Person)).scalars().all()
     for p in all_persons:
         if normalize_arabic(p.preferred_name) == normalized_query:
             add_match(p, p.preferred_name, 99.0, "exact_normalized")
 
-    # Stage 3: prefix match on normalized_form
     for v in all_variants:
         norm = v.normalized_form or normalize_arabic(v.written_form)
         if norm.startswith(normalized_query) and len(normalized_query) >= 2:
             add_match(v.person, v.written_form, 90.0, "prefix")
 
-    # Stage 4: token overlap
     query_tokens = set(normalized_query.split())
     for v in all_variants:
         norm = v.normalized_form or normalize_arabic(v.written_form)
@@ -74,7 +67,6 @@ def find_candidates(session: Session, query: str, limit: int = 10) -> list[Perso
         if query_tokens & variant_tokens:
             add_match(v.person, v.written_form, 80.0, "token")
 
-    # Stage 5: fuzzy similarity via rapidfuzz
     norm_map: dict[str, list[tuple[Person, str]]] = {}
     for v in all_variants:
         norm = v.normalized_form or normalize_arabic(v.written_form)
@@ -101,17 +93,35 @@ def create_person(
     nisba_1: str | None = None,
     nisba_2: str | None = None,
     laqab: str | None = None,
+    nasab: str | None = None,
     notes: str | None = None,
+    kunya: str | None = None,
+    known_as: str | None = None,
+    birth_date_as_written: str | None = None,
+    birth_year_earliest: int | None = None,
+    birth_year_latest: int | None = None,
+    death_date_as_written: str | None = None,
+    death_year_earliest: int | None = None,
+    death_year_latest: int | None = None,
+    birth_place: str | None = None,
+    death_place: str | None = None,
 ) -> Person:
-    """Fast-path create: only preferred_name is required."""
     person = Person(
         preferred_name=preferred_name,
-        ism=ism, nisba_1=nisba_1, nisba_2=nisba_2, laqab=laqab, notes=notes,
+        ism=ism, nisba_1=nisba_1, nisba_2=nisba_2, laqab=laqab, nasab=nasab, notes=notes,
+        kunya=kunya, known_as=known_as,
+        birth_date_as_written=birth_date_as_written,
+        birth_year_earliest=birth_year_earliest,
+        birth_year_latest=birth_year_latest,
+        death_date_as_written=death_date_as_written,
+        death_year_earliest=death_year_earliest,
+        death_year_latest=death_year_latest,
+        birth_place=birth_place,
+        death_place=death_place,
     )
     session.add(person)
     session.flush()
 
-    # Auto-add the preferred_name as a name variant
     variant = PersonNameVariant(
         person_id=person.id,
         written_form=preferred_name,
@@ -146,7 +156,7 @@ def add_name_variant(
 def update_person(session: Session, person_id: int, **kwargs) -> Person:
     person = session.get(Person, person_id)
     if not person:
-        raise ValueError(f"Person {person_id} not found")
+        raise ResourceNotFoundError("الشخص غير موجود")
     for key, value in kwargs.items():
         setattr(person, key, value)
     session.commit()
@@ -162,14 +172,20 @@ def list_persons(session: Session) -> list[Person]:
     return list(session.execute(select(Person).order_by(Person.preferred_name)).scalars().all())
 
 
-def set_ancestors(session: Session, person_id: int, ancestors: list[str]) -> None:
-    """Replace the full nasab chain for a person."""
+def get_wilayas(session: Session, person_id: int) -> list[str]:
+    rows = session.execute(
+        select(PersonWilaya).where(PersonWilaya.person_id == person_id)
+    ).scalars().all()
+    return [r.wilaya for r in rows]
+
+
+def set_wilayas(session: Session, person_id: int, wilayas: list[str]) -> None:
+    """Replace all wilayas for a person. 'مجهول' is a valid sentinel value."""
     existing = session.execute(
-        select(PersonAncestor).where(PersonAncestor.person_id == person_id)
+        select(PersonWilaya).where(PersonWilaya.person_id == person_id)
     ).scalars().all()
     for row in existing:
         session.delete(row)
-
-    for i, name in enumerate(ancestors, start=1):
-        session.add(PersonAncestor(person_id=person_id, position=i, name=name))
+    for wilaya in wilayas:
+        session.add(PersonWilaya(person_id=person_id, wilaya=wilaya))
     session.commit()

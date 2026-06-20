@@ -2,6 +2,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from ..db.models import Vocab
 
+_CATEGORY_LABELS: dict[str, str] = {
+    "role": "الدور",
+    "confidence": "درجة اليقين",
+    "evidence_source": "مصدر الدليل",
+    "work_type": "نوع الأثر",
+    "annotation_type": "نوع التقييد",
+    "date_precision": "دقة التاريخ",
+    "repository_kind": "نوع المستودع",
+    "person_identification_status": "حالة التعريف",
+}
+
 
 def list_values(session: Session, category: str) -> list[str]:
     """Return active vocab values for a category, ordered by sort_order."""
@@ -11,6 +22,21 @@ def list_values(session: Session, category: str) -> list[str]:
         .order_by(Vocab.sort_order)
     ).scalars().all()
     return list(rows)
+
+
+def validate_value(session: Session, category: str, value: str | None) -> None:
+    """Raise ValueError (Arabic) if value is not an active item in category.
+
+    Skips validation when value is None or empty (optional fields).
+    """
+    if not value:
+        return
+    valid = list_values(session, category)
+    if value not in valid:
+        label = _CATEGORY_LABELS.get(category, category)
+        raise ValueError(
+            f"القيمة '{value}' غير مقبولة لـ{label}. اختر من القائمة المعتمدة."
+        )
 
 
 def add_value(session: Session, category: str, value: str) -> Vocab:

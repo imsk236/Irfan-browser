@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from ..db.engine import get_session
 from ..services import persons as svc
+from ..services import trace as trace_svc
+from ..services.errors import ResourceNotFoundError
 
 router = APIRouter(prefix="/persons", tags=["persons"])
 
@@ -12,7 +14,18 @@ class PersonCreate(BaseModel):
     nisba_1: str | None = None
     nisba_2: str | None = None
     laqab: str | None = None
+    nasab: str | None = None
     notes: str | None = None
+    kunya: str | None = None
+    known_as: str | None = None
+    birth_date_as_written: str | None = None
+    birth_year_earliest: int | None = None
+    birth_year_latest: int | None = None
+    death_date_as_written: str | None = None
+    death_year_earliest: int | None = None
+    death_year_latest: int | None = None
+    birth_place: str | None = None
+    death_place: str | None = None
 
 
 class PersonUpdate(BaseModel):
@@ -21,7 +34,18 @@ class PersonUpdate(BaseModel):
     nisba_1: str | None = None
     nisba_2: str | None = None
     laqab: str | None = None
+    nasab: str | None = None
     notes: str | None = None
+    kunya: str | None = None
+    known_as: str | None = None
+    birth_date_as_written: str | None = None
+    birth_year_earliest: int | None = None
+    birth_year_latest: int | None = None
+    death_date_as_written: str | None = None
+    death_year_earliest: int | None = None
+    death_year_latest: int | None = None
+    birth_place: str | None = None
+    death_place: str | None = None
 
 
 class NameVariantAdd(BaseModel):
@@ -30,8 +54,8 @@ class NameVariantAdd(BaseModel):
     notes: str | None = None
 
 
-class AncestorsUpdate(BaseModel):
-    ancestors: list[str]
+class WilayasUpdate(BaseModel):
+    wilayas: list[str]
 
 
 class NameVariantOut(BaseModel):
@@ -52,9 +76,31 @@ class PersonOut(BaseModel):
     nisba_1: str | None
     nisba_2: str | None
     laqab: str | None
+    nasab: str | None
     notes: str | None
+    kunya: str | None
+    known_as: str | None
+    birth_date_as_written: str | None
+    birth_year_earliest: int | None
+    birth_year_latest: int | None
+    death_date_as_written: str | None
+    death_year_earliest: int | None
+    death_year_latest: int | None
+    birth_place: str | None
+    death_place: str | None
+    wilayas: list[str] = []
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_orm_with_wilayas(cls, person) -> "PersonOut":
+        data = {
+            col: getattr(person, col)
+            for col in cls.model_fields
+            if col != "wilayas" and hasattr(person, col)
+        }
+        data["wilayas"] = [w.wilaya for w in person.wilayas]
+        return cls(**data)
 
 
 class PersonMatchOut(BaseModel):
@@ -63,6 +109,24 @@ class PersonMatchOut(BaseModel):
     written_form: str
     score: float
     match_type: str
+
+
+class AppearanceOut(BaseModel):
+    """Archive appearance of a person — used by the person profile screen."""
+    relationship_id: int
+    role: str
+    level: str
+    confidence: str
+    serial: str
+    repository_volume_number: int | None
+    work_id: int | None
+    work_title: str | None
+    evidence_annotation_id: int | None
+    evidence_annotation_type: str | None
+    evidence_text: str | None
+    evidence_image_location: str | None
+    evidence_source: str | None
+    notes: str | None
 
 
 @router.get("/search", response_model=list[PersonMatchOut])
@@ -76,23 +140,18 @@ def search_persons(q: str = "", limit: int = 10):
 @router.post("", response_model=PersonOut, status_code=201)
 def create_person(body: PersonCreate):
     with get_session() as session:
-        person = svc.create_person(
-            session,
-            preferred_name=body.preferred_name,
-            ism=body.ism,
-            nisba_1=body.nisba_1,
-            nisba_2=body.nisba_2,
-            laqab=body.laqab,
-            notes=body.notes,
-        )
-        return PersonOut.model_validate(person)
+        try:
+            person = svc.create_person(session, **body.model_dump())
+            return PersonOut.from_orm_with_wilayas(person)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.get("", response_model=list[PersonOut])
 def list_persons():
     with get_session() as session:
         persons = svc.list_persons(session)
-        return [PersonOut.model_validate(p) for p in persons]
+        return [PersonOut.from_orm_with_wilayas(p) for p in persons]
 
 
 @router.get("/{person_id}", response_model=PersonOut)
@@ -101,7 +160,7 @@ def get_person(person_id: int):
         person = svc.get_person(session, person_id)
         if not person:
             raise HTTPException(status_code=404, detail="الشخص غير موجود")
-        return PersonOut.model_validate(person)
+        return PersonOut.from_orm_with_wilayas(person)
 
 
 @router.patch("/{person_id}", response_model=PersonOut)
@@ -110,9 +169,30 @@ def update_person(person_id: int, body: PersonUpdate):
     with get_session() as session:
         try:
             person = svc.update_person(session, person_id, **updates)
-            return PersonOut.model_validate(person)
+            return PersonOut.from_orm_with_wilayas(person)
+        except ResourceNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.get("/{person_id}/wilayas", response_model=list[str])
+def get_wilayas(person_id: int):
+    with get_session() as session:
+        return svc.get_wilayas(session, person_id)
+
+
+@router.put("/{person_id}/wilayas", status_code=204)
+def set_wilayas(person_id: int, body: WilayasUpdate):
+    with get_session() as session:
+        svc.set_wilayas(session, person_id, body.wilayas)
+
+
+@router.get("/{person_id}/appearances", response_model=list[AppearanceOut])
+def get_person_appearances(person_id: int):
+    with get_session() as session:
+        results = trace_svc.trace_scholar(session, person_id)
+        return [AppearanceOut(**vars(r)) for r in results]
 
 
 @router.get("/{person_id}/variants", response_model=list[NameVariantOut])
@@ -135,9 +215,3 @@ def add_name_variant(person_id: int, body: NameVariantAdd):
             notes=body.notes,
         )
         return NameVariantOut.model_validate(variant)
-
-
-@router.put("/{person_id}/ancestors", status_code=204)
-def set_ancestors(person_id: int, body: AncestorsUpdate):
-    with get_session() as session:
-        svc.set_ancestors(session, person_id, body.ancestors)

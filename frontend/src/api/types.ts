@@ -2,7 +2,7 @@ export interface Repository {
   id: number;
   place_key: string;
   name: string;
-  kind: string;
+  location: string | null;
   notes: string | null;
 }
 
@@ -11,7 +11,7 @@ export interface Volume {
   repository_id: number;
   document_number: number;
   serial: string;
-  library_shelfmark: string | null;
+  repository_volume_number: number | null;
   folio_count: number | null;
   notes: string | null;
 }
@@ -20,9 +20,14 @@ export interface Work {
   id: number;
   volume_id: number;
   title: string;
-  work_type: string | null;
   start_unit: string | null;
   end_unit: string | null;
+  copy_date_as_written: string | null;
+  copy_year: number | null;
+  copy_month: string | null;
+  copy_day: number | null;
+  copy_weekday: string | null;
+  copy_time: string | null;
   notes: string | null;
 }
 
@@ -32,10 +37,6 @@ export interface Annotation {
   work_id: number | null;
   annotation_type: string;
   text_as_written: string | null;
-  date_as_written: string | null;
-  date_earliest: number | null;
-  date_latest: number | null;
-  date_precision: string | null;
   image_location: string | null;
   notes: string | null;
 }
@@ -44,9 +45,21 @@ export interface Person {
   id: number;
   preferred_name: string;
   ism: string | null;
+  kunya: string | null;
+  laqab: string | null;
   nisba_1: string | null;
   nisba_2: string | null;
-  laqab: string | null;
+  known_as: string | null;
+  nasab: string | null;
+  birth_date_as_written: string | null;
+  birth_year_earliest: number | null;
+  birth_year_latest: number | null;
+  death_date_as_written: string | null;
+  death_year_earliest: number | null;
+  death_year_latest: number | null;
+  birth_place: string | null;
+  death_place: string | null;
+  wilayas: string[];
   notes: string | null;
 }
 
@@ -86,9 +99,29 @@ export interface TraceResult {
   level: string;
   confidence: string;
   serial: string;
+  repository_volume_number: number | null;
   work_id: number | null;
   work_title: string | null;
   evidence_annotation_id: number | null;
+  evidence_annotation_type: string | null;
+  evidence_text: string | null;
+  evidence_image_location: string | null;
+  evidence_source: string | null;
+  notes: string | null;
+}
+
+/** Returned by GET /persons/{id}/appearances */
+export interface Appearance {
+  relationship_id: number;
+  role: string;
+  level: string;
+  confidence: string;
+  serial: string;
+  repository_volume_number: number | null;
+  work_id: number | null;
+  work_title: string | null;
+  evidence_annotation_id: number | null;
+  evidence_annotation_type: string | null;
   evidence_text: string | null;
   evidence_image_location: string | null;
   evidence_source: string | null;

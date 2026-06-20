@@ -1,34 +1,32 @@
 import "./Navigation.css";
 
-export type Screen = "volumes" | "annotations" | "persons" | "trace";
+export type Screen = "volumes" | "persons" | "trace" | "settings";
 
 interface Props {
   active: Screen;
   onNavigate: (screen: Screen) => void;
 }
 
-const NAV_ITEMS: { id: Screen; label: string }[] = [
-  { id: "volumes", label: "المجلدات" },
-  { id: "annotations", label: "التقييدات" },
-  { id: "persons", label: "الأشخاص" },
-  { id: "trace", label: "تتبع عالم" },
+const NAV_ITEMS: { id: Screen; label: string; icon: string }[] = [
+  { id: "volumes",  label: "المجلدات",       icon: "▦" },
+  { id: "persons",  label: "الأشخاص",        icon: "◉" },
+  { id: "trace",    label: "البحث والتتبع",   icon: "◎" },
+  { id: "settings", label: "الإعدادات",       icon: "⚙" },
 ];
 
 export function Navigation({ active, onNavigate }: Props) {
   return (
-    <nav className="nav-sidebar">
-      <div className="nav-logo">
-        <span className="nav-logo-mark">أ</span>
-        <span className="nav-logo-text">أرشيف إرفان</span>
-      </div>
-      <ul className="nav-list">
+    <nav className="nav-sidebar" aria-label="القائمة الرئيسية">
+      <ul className="nav-list" role="list">
         {NAV_ITEMS.map((item) => (
           <li key={item.id}>
             <button
               className={`nav-item ${active === item.id ? "active" : ""}`}
               onClick={() => onNavigate(item.id)}
+              aria-current={active === item.id ? "page" : undefined}
             >
-              {item.label}
+              <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
             </button>
           </li>
         ))}

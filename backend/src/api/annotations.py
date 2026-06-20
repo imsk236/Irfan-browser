@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from ..db.engine import get_session
 from ..services import annotations as svc
+from ..services.errors import ResourceNotFoundError
 
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 
@@ -11,17 +12,14 @@ class AnnotationCreate(BaseModel):
     annotation_type: str
     work_id: int | None = None
     text_as_written: str | None = None
-    date_as_written: str | None = None
-    date_precision: str | None = None
     image_location: str | None = None
     notes: str | None = None
 
 
 class AnnotationUpdate(BaseModel):
     annotation_type: str | None = None
+    work_id: int | None = None
     text_as_written: str | None = None
-    date_as_written: str | None = None
-    date_precision: str | None = None
     image_location: str | None = None
     notes: str | None = None
 
@@ -32,10 +30,6 @@ class AnnotationOut(BaseModel):
     work_id: int | None
     annotation_type: str
     text_as_written: str | None
-    date_as_written: str | None
-    date_earliest: int | None
-    date_latest: int | None
-    date_precision: str | None
     image_location: str | None
     notes: str | None
 
@@ -45,18 +39,19 @@ class AnnotationOut(BaseModel):
 @router.post("", response_model=AnnotationOut, status_code=201)
 def create_annotation(body: AnnotationCreate):
     with get_session() as session:
-        annotation = svc.create_annotation(
-            session,
-            volume_id=body.volume_id,
-            annotation_type=body.annotation_type,
-            work_id=body.work_id,
-            text_as_written=body.text_as_written,
-            date_as_written=body.date_as_written,
-            date_precision=body.date_precision,
-            image_location=body.image_location,
-            notes=body.notes,
-        )
-        return AnnotationOut.model_validate(annotation)
+        try:
+            annotation = svc.create_annotation(
+                session,
+                volume_id=body.volume_id,
+                annotation_type=body.annotation_type,
+                work_id=body.work_id,
+                text_as_written=body.text_as_written,
+                image_location=body.image_location,
+                notes=body.notes,
+            )
+            return AnnotationOut.model_validate(annotation)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.get("/by-volume/{volume_id}", response_model=list[AnnotationOut])
@@ -71,7 +66,7 @@ def get_annotation(annotation_id: int):
     with get_session() as session:
         annotation = svc.get_annotation(session, annotation_id)
         if not annotation:
-            raise HTTPException(status_code=404, detail="التقييد غير موجود")
+            raise HTTPException(status_code=404, detail="القيد غير موجود")
         return AnnotationOut.model_validate(annotation)
 
 
@@ -82,6 +77,8 @@ def update_annotation(annotation_id: int, body: AnnotationUpdate):
         try:
             annotation = svc.update_annotation(session, annotation_id, **updates)
             return AnnotationOut.model_validate(annotation)
+        except ResourceNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
 
@@ -89,4 +86,9 @@ def update_annotation(annotation_id: int, body: AnnotationUpdate):
 @router.delete("/{annotation_id}", status_code=204)
 def delete_annotation(annotation_id: int):
     with get_session() as session:
-        svc.delete_annotation(session, annotation_id)
+        try:
+            svc.delete_annotation(session, annotation_id)
+        except ResourceNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))

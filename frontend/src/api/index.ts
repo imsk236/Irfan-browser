@@ -1,7 +1,7 @@
 import { api } from "./client";
 import type {
   Repository, Volume, Work, Annotation, Person, PersonMatch,
-  NameVariant, Relationship, TraceResult,
+  NameVariant, Relationship, TraceResult, Appearance,
 } from "./types";
 
 // Repositories & Volumes
@@ -9,11 +9,23 @@ export const volumesApi = {
   listRepositories: () => api.get<Repository[]>("/volumes/repositories"),
   createRepository: (body: Omit<Repository, "id">) =>
     api.post<Repository>("/volumes/repositories", body),
+  getRepository: (id: number) =>
+    api.get<Repository>(`/volumes/repositories/${id}`),
+  updateRepository: (id: number, body: Partial<Omit<Repository, "id">>) =>
+    api.patch<Repository>(`/volumes/repositories/${id}`, body),
+  deleteRepository: (id: number) =>
+    api.delete(`/volumes/repositories/${id}`),
 
   list: () => api.get<Volume[]>("/volumes"),
   get: (id: number) => api.get<Volume>(`/volumes/${id}`),
-  create: (body: { repository_id: number; library_shelfmark?: string; folio_count?: number; notes?: string }) =>
-    api.post<Volume>("/volumes", body),
+  nextDocumentNumber: (repositoryId: number) =>
+    api.get<number>(`/volumes/next-document-number?repository_id=${repositoryId}`),
+  create: (body: {
+    repository_id: number;
+    repository_volume_number?: number;
+    folio_count?: number;
+    notes?: string;
+  }) => api.post<Volume>("/volumes", body),
   update: (id: number, body: Partial<Volume>) =>
     api.patch<Volume>(`/volumes/${id}`, body),
   delete: (id: number) => api.delete(`/volumes/${id}`),
@@ -24,8 +36,19 @@ export const worksApi = {
   listForVolume: (volumeId: number) =>
     api.get<Work[]>(`/works/by-volume/${volumeId}`),
   get: (id: number) => api.get<Work>(`/works/${id}`),
-  create: (body: { volume_id: number; title: string; work_type?: string; start_unit?: string; end_unit?: string; notes?: string }) =>
-    api.post<Work>("/works", body),
+  create: (body: {
+    volume_id: number;
+    title: string;
+    start_unit?: string;
+    end_unit?: string;
+    copy_date_as_written?: string;
+    copy_year?: number;
+    copy_month?: string;
+    copy_day?: number;
+    copy_weekday?: string;
+    copy_time?: string;
+    notes?: string;
+  }) => api.post<Work>("/works", body),
   update: (id: number, body: Partial<Work>) =>
     api.patch<Work>(`/works/${id}`, body),
   delete: (id: number) => api.delete(`/works/${id}`),
@@ -36,8 +59,14 @@ export const annotationsApi = {
   listForVolume: (volumeId: number) =>
     api.get<Annotation[]>(`/annotations/by-volume/${volumeId}`),
   get: (id: number) => api.get<Annotation>(`/annotations/${id}`),
-  create: (body: Partial<Annotation> & { volume_id: number; annotation_type: string }) =>
-    api.post<Annotation>("/annotations", body),
+  create: (body: {
+    volume_id: number;
+    annotation_type: string;
+    work_id?: number;
+    text_as_written?: string;
+    image_location?: string;
+    notes?: string;
+  }) => api.post<Annotation>("/annotations", body),
   update: (id: number, body: Partial<Annotation>) =>
     api.patch<Annotation>(`/annotations/${id}`, body),
   delete: (id: number) => api.delete(`/annotations/${id}`),
@@ -55,10 +84,17 @@ export const personsApi = {
     api.patch<Person>(`/persons/${id}`, body),
   listVariants: (id: number) =>
     api.get<NameVariant[]>(`/persons/${id}/variants`),
-  addVariant: (id: number, body: { written_form: string; source_annotation_id?: number; notes?: string }) =>
-    api.post<NameVariant>(`/persons/${id}/variants`, body),
-  setAncestors: (id: number, ancestors: string[]) =>
-    api.put(`/persons/${id}/ancestors`, { ancestors }),
+  addVariant: (id: number, body: {
+    written_form: string;
+    source_annotation_id?: number;
+    notes?: string;
+  }) => api.post<NameVariant>(`/persons/${id}/variants`, body),
+  getWilayas: (id: number) =>
+    api.get<string[]>(`/persons/${id}/wilayas`),
+  setWilayas: (id: number, wilayas: string[]) =>
+    api.put(`/persons/${id}/wilayas`, { wilayas }),
+  appearances: (id: number) =>
+    api.get<Appearance[]>(`/persons/${id}/appearances`),
 };
 
 // Relationships

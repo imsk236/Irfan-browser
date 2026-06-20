@@ -11,9 +11,11 @@ class TraceResult:
     level: str
     confidence: str
     serial: str
+    repository_volume_number: int | None
     work_id: int | None
     work_title: str | None
     evidence_annotation_id: int | None
+    evidence_annotation_type: str | None
     evidence_text: str | None
     evidence_image_location: str | None
     evidence_source: str | None
@@ -34,6 +36,7 @@ def trace_scholar(session: Session, person_id: int) -> list[TraceResult]:
     results: list[TraceResult] = []
     for rel in rels:
         serial = ""
+        repository_volume_number = None
         work_title = None
 
         if rel.level == "work" and rel.work_id:
@@ -41,18 +44,24 @@ def trace_scholar(session: Session, person_id: int) -> list[TraceResult]:
             if work:
                 work_title = work.title
                 volume = session.get(Volume, work.volume_id)
-                serial = volume.serial if volume else ""
+                if volume:
+                    serial = volume.serial
+                    repository_volume_number = volume.repository_volume_number
         elif rel.level == "volume" and rel.volume_id:
             volume = session.get(Volume, rel.volume_id)
-            serial = volume.serial if volume else ""
+            if volume:
+                serial = volume.serial
+                repository_volume_number = volume.repository_volume_number
 
         evidence_text = None
         evidence_image = None
+        evidence_annotation_type = None
         if rel.evidence_annotation_id:
             annotation = session.get(Annotation, rel.evidence_annotation_id)
             if annotation:
                 evidence_text = annotation.text_as_written
                 evidence_image = annotation.image_location
+                evidence_annotation_type = annotation.annotation_type
 
         results.append(TraceResult(
             relationship_id=rel.id,
@@ -60,9 +69,11 @@ def trace_scholar(session: Session, person_id: int) -> list[TraceResult]:
             level=rel.level,
             confidence=rel.confidence,
             serial=serial,
+            repository_volume_number=repository_volume_number,
             work_id=rel.work_id,
             work_title=work_title,
             evidence_annotation_id=rel.evidence_annotation_id,
+            evidence_annotation_type=evidence_annotation_type,
             evidence_text=evidence_text,
             evidence_image_location=evidence_image,
             evidence_source=rel.evidence_source,
