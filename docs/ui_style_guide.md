@@ -641,18 +641,6 @@ Screens such as volumes, persons, and annotations should use a reusable list-det
 - Avoid large blank regions
 - Editing should preferably occur in-place or in a side panel
 
-### 19.3 Current implementation correction
-
-The current prototype’s dark-green full-height navigation and oversized empty workspace do not match the target. Replace them with:
-
-- white right navigation
-- slim active marker
-- compact top utility header
-- balanced list and detail widths
-- meaningful empty states
-- denser content layout
-- clear lower evidence workspace where relevant
-
 ---
 
 ## 20. Side panels and modals

@@ -88,19 +88,19 @@ CREATE TABLE repositories (
   id            INTEGER PRIMARY KEY,
   place_key     TEXT NOT NULL UNIQUE,        -- 4-digit string, e.g. '0001'
   name          TEXT NOT NULL,
-  kind          TEXT NOT NULL,               -- FK-by-value -> vocab repository_kind (institution | personal)
+  location      TEXT,                        -- Omani wilaya or place name where the repository is located
   notes         TEXT
 );
 
 -- المجلدات
 CREATE TABLE volumes (
-  id                 INTEGER PRIMARY KEY,
-  repository_id      INTEGER NOT NULL REFERENCES repositories(id),
-  document_number    INTEGER NOT NULL,        -- running count within repository
-  serial             TEXT NOT NULL UNIQUE,    -- assembled 'PPPP-DDDD', editable
-  library_shelfmark  TEXT,                     -- the library's own number, informational
-  folio_count        INTEGER,
-  notes              TEXT,
+  id                      INTEGER PRIMARY KEY,
+  repository_id           INTEGER NOT NULL REFERENCES repositories(id),
+  document_number         INTEGER NOT NULL,        -- running count within repository
+  serial                  TEXT NOT NULL UNIQUE,    -- assembled 'PPPP-DDDD', editable
+  repository_volume_number INTEGER,                -- optional: the volume's shelf number within the repository
+  folio_count             INTEGER,
+  notes                   TEXT,
   UNIQUE (repository_id, document_number)
 );
 
@@ -108,8 +108,8 @@ CREATE TABLE volumes (
 CREATE TABLE persons (
   id                    INTEGER PRIMARY KEY,
   preferred_name        TEXT NOT NULL,              -- الاسم المعتمد؛ الحقل الوحيد المطلوب
-  identification_status TEXT,                       -- vocab person_identification_status
   ism                   TEXT,
+  nasab                 TEXT,                       -- free-text nasab chain (e.g. ابن فلان بن فلان)
   kunya                 TEXT,
   laqab                 TEXT,
   nisba_1               TEXT,
@@ -123,21 +123,18 @@ CREATE TABLE persons (
   death_year_latest     INTEGER,
   birth_place           TEXT,
   death_place           TEXT,
-  region_or_country     TEXT,
-  scholarly_affiliation TEXT,
-  occupation_or_status  TEXT,
   notes                 TEXT
 );
 -- preferred_name carries names that resist clean splitting, e.g. أبو محمد المعروف بابن النظر.
--- Structured fields (ism, nisba, laqab) stay optional and can be filled in later.
+-- Structured fields (ism, nasab, nisba, laqab) stay optional and can be filled in later.
 
--- nasab chain of flexible depth (enables lineage queries in phase 2)
-CREATE TABLE person_ancestors (
-  id          INTEGER PRIMARY KEY,
-  person_id   INTEGER NOT NULL REFERENCES persons(id),
-  position    INTEGER NOT NULL,                -- 1 = father, 2 = grandfather, ...
-  name        TEXT NOT NULL,
-  UNIQUE (person_id, position)
+-- Omani wilayas associated with a person (junction table; one row per wilaya)
+-- Special sentinel value "مجهول" means region unknown; "خارج عُمان" means outside Oman.
+-- If "مجهول" is present, no other rows exist for that person.
+CREATE TABLE person_wilayas (
+  id         INTEGER PRIMARY KEY,
+  person_id  INTEGER NOT NULL REFERENCES persons(id),
+  wilaya     TEXT NOT NULL
 );
 
 -- witness name forms: every spelling of this person found in manuscripts
@@ -156,15 +153,21 @@ CREATE TABLE person_name_variants (
 
 -- الآثار
 CREATE TABLE works (
-  id               INTEGER PRIMARY KEY,
-  volume_id        INTEGER NOT NULL REFERENCES volumes(id),
-  title            TEXT NOT NULL,
+  id                   INTEGER PRIMARY KEY,
+  volume_id            INTEGER NOT NULL REFERENCES volumes(id),
+  title                TEXT NOT NULL,
   -- NOTE: no author column. Authorship is a person_relationships row with role = مؤلف.
   -- One authoritative representation; supports multiple and uncertain authors with confidence.
-  work_type        TEXT,                       -- vocab work_type
-  start_unit       TEXT,
-  end_unit         TEXT,
-  notes            TEXT
+  -- Copy date (six components, all nullable — NULL means مجهول):
+  copy_date_as_written TEXT,                   -- witness: verbatim Hijri copy-date string
+  copy_year            INTEGER,
+  copy_month           TEXT,                   -- one of the 12 Hijri month names
+  copy_day             INTEGER,                -- 1–30
+  copy_weekday         TEXT,                   -- one of the 7 Arabic weekday names
+  copy_time            TEXT,                   -- e.g. وقت الضحى (controlled vocab)
+  start_unit           TEXT,
+  end_unit             TEXT,
+  notes                TEXT
 );
 
 -- التقييدات (primary historical source)
@@ -174,10 +177,6 @@ CREATE TABLE annotations (
   work_id         INTEGER REFERENCES works(id),     -- nullable
   annotation_type TEXT NOT NULL,               -- vocab annotation_type
   text_as_written TEXT,                         -- witness
-  date_as_written TEXT,                         -- witness, verbatim Hijri string
-  date_earliest   INTEGER,                      -- interpretation: normalized sortable Hijri bound
-  date_latest     INTEGER,                      -- interpretation
-  date_precision  TEXT,                         -- vocab date_precision (day|month|year|decade|century|unknown)
   image_location  TEXT,                         -- اللوحة, e.g. '15ي', '15س'
   notes           TEXT
 );
@@ -205,7 +204,7 @@ CREATE TABLE person_relationships (
 -- performance reason to denormalize, and storing both invites contradictory states.
 ```
 
-**Date normalization:** store `date_as_written` verbatim. Derive `date_earliest`/`date_latest` as comparable Hijri integers (e.g. packed `YYYYMMDD`, missing components expanded to the bound: a year-only date → earliest = YYYY0101, latest = YYYY1230). This lets range queries ("annotations 1050–1100 AH") work without faking precision. Hijri is primary; a Gregorian equivalent column may be added later as convenience.
+**Copy date normalization (works):** `copy_date_as_written` is a verbatim witness from the manuscript. The structured components (`copy_year`, `copy_month`, `copy_day`, `copy_weekday`, `copy_time`) are interpretations — fill in only what is explicitly stated; never fabricate missing precision. Hijri is primary throughout.
 
 **Evidence annotation consistency (service-layer rule):** a foreign key alone cannot guarantee the linked annotation belongs to the right place, so the service layer must validate it. For a work-level relationship, `evidence_annotation_id` must point to an annotation in the same work, or at least the same volume. For a volume-level relationship, the annotation must belong to that volume. When no annotation is linked, require an `evidence_source` value instead, or explicitly mark the link as an undocumented interpretation. This rule is mandatory; skipping it silently corrupts the evidence trail.
 
@@ -220,11 +219,7 @@ Store in a single `vocab(category, value, sort_order)` table or one table per ca
 - `role`: مؤلف، ناسخ، مالك، مستعير، واقف، مقيّد، **مذكور**
 - `confidence`: مؤكد، مرجح، محتمل
 - `evidence_source`: قيد الفراغ، ظهرية الكتاب، تحليل الخط، قيد
-- `work_type`: كتاب، رسالة، قصيدة، فتوى
 - `annotation_type`: تملك، وقف، إهداء، ولادة، وفاة
-- `date_precision`: يوم، شهر، سنة، عقد، قرن، مجهول
-- `repository_kind`: مؤسسة، مكتبة شخصية
-- `person_identification_status`: معروف، غير مكتمل التعريف، مجهول، يحتاج إلى مراجعة
 
 All categories must be admin-extendable (researcher can add new values later). **Vocabulary values that are already in use must never be physically deleted.** Carry an `is_active` flag instead: an inactive value stays valid for existing records but disappears from new-entry dropdowns. (Values remain stored by value as above; an ID-based vocabulary is deliberately out of scope to keep the prototype simple.)
 
@@ -266,7 +261,6 @@ Most fields are optional. The researcher must be able to save a person using onl
 Always visible:
 
 - **الاسم المعتمد** — required; the main display and search name.
-- **حالة التعريف** — optional controlled vocabulary: معروف، غير مكتمل التعريف، مجهول، يحتاج إلى مراجعة.
 
 The preferred name may be entered as one complete string. Structured fields are never required for initial creation.
 
@@ -275,14 +269,14 @@ The preferred name may be entered as one complete string. Structured fields are 
 Optional and collapsed by default:
 
 - الاسم الشخصي
-- سلسلة النسب of flexible depth
+- النسب (free text, e.g. ابن فلان بن فلان)
 - الكنية
 - اللقب
 - النسبة الأولى
 - النسبة الثانية
 - الشهرة أو المعروف به
 
-The nasab chain uses repeatable rows so the researcher may add as many ancestors as needed. Structured fields must not automatically overwrite the preferred name.
+Structured fields must not automatically overwrite the preferred name.
 
 #### 7.2.3 Name variants
 
@@ -302,9 +296,7 @@ Optional and collapsed by default:
 - death date or approximate death range;
 - birth place;
 - death place;
-- region or country;
-- scholarly affiliation or school, when the researcher chooses to record it;
-- occupation, scholarly status, or another identifying description.
+- Omani wilayas (multi-select; includes "مجهول" and "خارج عُمان" as special options).
 
 None of these fields is required to create a person.
 
@@ -378,8 +370,6 @@ A single annotation may contain several connected or merely mentioned persons. T
 │ الهوية الأساسية                             │
 │ الاسم المعتمد *                              │
 │ [                                           ]│
-│ حالة التعريف                                 │
-│ [اختر الحالة]                                │
 ├──────────────────────────────────────────────┤
 │ تفاصيل الاسم                         [فتح]   │
 ├──────────────────────────────────────────────┤
@@ -409,7 +399,7 @@ Input: a selected standard person (found via the same Arabic-tolerant search). O
 
 Results must aggregate across all of the person's name variants (because everything links via the surrogate `person_id`, this is automatic). A result list that silently omits matches is worse than none — correctness of this aggregation is the project's whole point.
 
-Phase 2 (later, not v1): scholarly networks, lineage networks via `nisba`/`person_ancestors`, ownership chains, date-bounded queries. The schema already supports these; no v1 UI required.
+Phase 2 (later, not v1): scholarly networks, lineage queries via `nisba`/wilaya, ownership chains, date-bounded queries. The schema already supports these; no v1 UI required.
 
 ---
 

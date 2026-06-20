@@ -68,7 +68,7 @@ Migration files live in `backend/migrations/versions/`. Follow the established p
 - Always use `op.batch_alter_table()` in `downgrade()` (SQLite requires it for column drops)
 - All new columns must be `nullable=True` (SQLite can't ADD COLUMN NOT NULL without DEFAULT)
 
-Current chain: `001_baseline` → `002_person_biographical_fields` → `003_add_repository_volume_number`
+Current chain: `001_baseline` → `002_person_biographical_fields` → `003_add_repository_volume_number` → `004_repository_location_drop_kind` → `005_volume_drop_library_shelfmark` → `006_work_copy_date_drop_type` → `007_annotation_drop_date_fields` → `008_person_wilayas_nasab`
 
 ## Backend patterns
 
@@ -105,7 +105,7 @@ When adding a field: update the interface in `types.ts`, then the relevant API c
 
 ### Vocab fields
 
-Dropdowns backed by the `vocab` table use `<VocabSelect category="..." />`. Categories: `repository_kind`, `work_type`, `annotation_type`, `date_precision`, `confidence`. Seed data in `backend/src/db/seed.py`.
+Dropdowns backed by the `vocab` table use `<VocabSelect category="..." />`. Categories: `annotation_type`, `confidence`, `evidence_source`, `role`. Seed data in `backend/src/db/seed.py`.
 
 ### RTL / styling
 
@@ -126,7 +126,7 @@ def test_something(client, session):
 
 - **Witness vs interpretation** — `*_as_written` fields are verbatim transcriptions (immutable evidence). Normalized/interpreted fields carry a confidence level.
 - **Serial** — `PPPP-DDDD` format, auto-generated from `repository.place_key` + `volume.document_number`. Never hand-typed. Components editable; serial regenerates automatically.
-- **رقم المجلد في الخزانة** — optional integer, the volume's number within the physical repository (manually entered, separate from the serial).
-- **رقم الخزنة** — the library's own shelfmark string (`library_shelfmark` in DB).
+- **رقم المجلد في الخزانة** — optional integer, the volume's number within the physical repository (`repository_volume_number` in DB), manually entered and separate from the serial.
 - **Relationships** link persons to volumes or works via roles (مؤلف، ناسخ، مالك، مستعير، واقف، مقيّد، مذكور). The `level` field is `"volume"` or `"work"`.
-- **Annotations (قيود)** are physical inscriptions on a manuscript — ownership marks, reading certificates, etc. They can be linked to a specific work within a volume.
+- **Annotations (قيود)** are physical inscriptions on a manuscript — ownership marks, reading certificates, etc. They can be linked to a specific work within a volume. Dates are **not** tracked on قيود.
+- **person_wilayas** — junction table linking a person to one or more Omani wilayas. Sentinel values: `"مجهول"` (unknown) and `"خارج عُمان"` (outside Oman).

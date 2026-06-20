@@ -1,6 +1,6 @@
 # ADR 0001: person_wilayas junction table for region storage
 
-**Status:** Accepted
+**Status:** Implemented (migration `008_person_wilayas_nasab`)
 
 ## Context
 
