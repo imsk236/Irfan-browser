@@ -6,6 +6,7 @@ interface Props {
   work: Work | null;
   relationships?: Relationship[];
   personMap?: Map<number, string>;
+  folioCount?: number | null;
   onSaved: () => void;
   onCancel: () => void;
 }

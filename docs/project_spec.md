@@ -165,8 +165,8 @@ CREATE TABLE works (
   copy_day             INTEGER,                -- 1–30
   copy_weekday         TEXT,                   -- one of the 7 Arabic weekday names
   copy_time            TEXT,                   -- e.g. وقت الضحى (controlled vocab)
-  start_unit           TEXT,
-  end_unit             TEXT,
+  start_unit           TEXT,    -- first folio of work, encoded as '{n}ي' or '{n}س', e.g. '1ي'
+  end_unit             TEXT,    -- last folio of work, same encoding, e.g. '24س'
   notes                TEXT
 );
 
@@ -177,7 +177,7 @@ CREATE TABLE annotations (
   work_id         INTEGER REFERENCES works(id),     -- nullable
   annotation_type TEXT NOT NULL,               -- vocab annotation_type
   text_as_written TEXT,                         -- witness
-  image_location  TEXT,                         -- اللوحة, e.g. '15ي', '15س'
+  image_location  TEXT,                         -- اللوحة, single folio face, encoded as '{n}ي' or '{n}س', e.g. '15ي'
   notes           TEXT
 );
 
@@ -203,6 +203,8 @@ CREATE TABLE person_relationships (
 -- Do not store both work_id and volume_id on one row; at this scale there is no
 -- performance reason to denormalize, and storing both invites contradictory states.
 ```
+
+**Folio encoding — `start_unit`, `end_unit`, `image_location`:** all three columns store a folio face reference as a single TEXT value in the form `{n}ي` (يمين, right face) or `{n}س` (يسار, left face), e.g. `1ي`, `24س`, `15ي`. The physical ordering within a volume is `1ي → 1س → 2ي → 2س …` — يمين of a given folio always precedes يسار of the same folio. The UI enforces two constraints at save time: (a) `start_unit` must not be later than `end_unit` per this ordering, and (b) the folio number of either unit must not exceed the volume's `folio_count` when that field is set. `image_location` on annotations is a single face, not a range.
 
 **Copy date normalization (works):** `copy_date_as_written` is a verbatim witness from the manuscript. The structured components (`copy_year`, `copy_month`, `copy_day`, `copy_weekday`, `copy_time`) are interpretations — fill in only what is explicitly stated; never fabricate missing precision. Hijri is primary throughout.
 
@@ -385,6 +387,22 @@ A single annotation may contain several connected or merely mentioned persons. T
 ```
 
 Advanced sections are collapsed by default. The basic identity remains visible. The card should occupy a focused, readable content column and avoid excessive empty space.
+
+### 7.9 Folio input widget
+
+Every field that references a folio face (`الورقة الأولى`, `الورقة الأخيرة`, `موضع اللوحة`) uses a compound input composed of:
+
+1. An integer field for the folio number (positive integers only).
+2. A يمين / يسار dropdown immediately beside it.
+
+Behavior:
+- The dropdown defaults to **يمين** and is **dimmed / disabled** until a number is entered.
+- When both fields are filled the widget encodes the value as `{n}ي` or `{n}س` before writing to state or submitting.
+- The widget displays an inline error (red border + text) if the entered number exceeds `folio_count` for the volume, when that field is set.
+- On submit, the form blocks with an Arabic error message if: the folio number exceeds `folio_count`, or (in the work form) `start_unit` is later than `end_unit` per the physical ordering `1ي → 1س → 2ي → 2س …`.
+- If `folio_count` is null on the volume, the cap check is skipped entirely.
+
+The `موضع اللوحة` field on قيود is a **single face reference** only — no end field, no range comparison.
 
 ---
 

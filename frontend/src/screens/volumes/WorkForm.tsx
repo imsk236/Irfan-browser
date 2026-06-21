@@ -2,7 +2,14 @@ import { useState } from "react";
 import { worksApi, relationshipsApi } from "../../api";
 import { VocabSelect } from "../../components/VocabSelect";
 import { PersonField } from "../../components/PersonField";
+import { FolioInput } from "../../components/FolioInput";
 import type { Relationship, Work } from "../../api/types";
+
+function folioToInt(encoded: string): number | null {
+  const m = encoded.match(/^(\d+)([يس])$/);
+  if (!m) return null;
+  return parseInt(m[1]) * 2 + (m[2] === "ي" ? 0 : 1);
+}
 
 interface SelectedPerson {
   person_id: number;
@@ -15,18 +22,18 @@ interface Props {
   work: Work | null;
   relationships?: Relationship[];
   personMap?: Map<number, string>;
+  folioCount?: number | null;
   onSaved: () => void;
   onCancel: () => void;
 }
 
-export function WorkForm({ volumeId, work, relationships, personMap, onSaved, onCancel }: Props) {
+export function WorkForm({ volumeId, work, relationships, personMap, folioCount, onSaved, onCancel }: Props) {
   const [title, setTitle] = useState(work?.title ?? "");
   const [startUnit, setStartUnit] = useState(work?.start_unit ?? "");
   const [endUnit, setEndUnit] = useState(work?.end_unit ?? "");
   const [notes, setNotes] = useState(work?.notes ?? "");
 
   // Copy date fields
-  const [copyDateAsWritten, setCopyDateAsWritten] = useState(work?.copy_date_as_written ?? "");
   const [copyYear, setCopyYear] = useState(work?.copy_year?.toString() ?? "");
   const [copyMonth, setCopyMonth] = useState(work?.copy_month ?? "");
   const [copyDay, setCopyDay] = useState(work?.copy_day?.toString() ?? "");
@@ -81,6 +88,33 @@ export function WorkForm({ volumeId, work, relationships, personMap, onSaved, on
       }
     }
 
+    // Validate folio ordering: 1ي < 1س < 2ي < 2س …
+    if (startUnit && endUnit) {
+      const sv = folioToInt(startUnit);
+      const ev = folioToInt(endUnit);
+      if (sv !== null && ev !== null && sv > ev) {
+        setError("الورقة الأولى يجب أن تسبق الورقة الأخيرة أو تساويها.");
+        return;
+      }
+    }
+    // Validate folio cap against volume's folio_count
+    if (folioCount) {
+      if (startUnit) {
+        const m = startUnit.match(/^(\d+)/);
+        if (m && parseInt(m[1]) > folioCount) {
+          setError(`رقم الورقة الأولى (${m[1]}) يتجاوز عدد الأوراق (${folioCount})`);
+          return;
+        }
+      }
+      if (endUnit) {
+        const m = endUnit.match(/^(\d+)/);
+        if (m && parseInt(m[1]) > folioCount) {
+          setError(`رقم الورقة الأخيرة (${m[1]}) يتجاوز عدد الأوراق (${folioCount})`);
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
       let savedWork: Work;
@@ -88,7 +122,6 @@ export function WorkForm({ volumeId, work, relationships, personMap, onSaved, on
         title,
         start_unit: startUnit || undefined,
         end_unit: endUnit || undefined,
-        copy_date_as_written: copyDateAsWritten || undefined,
         copy_year: copyYear ? parseInt(copyYear) : undefined,
         copy_month: copyMonth || undefined,
         copy_day: copyDay ? parseInt(copyDay) : undefined,
@@ -314,24 +347,12 @@ export function WorkForm({ volumeId, work, relationships, personMap, onSaved, on
 
         <div className="field">
           <label>الورقة الأولى</label>
-          <input
-            className="input"
-            type="text"
-            value={startUnit}
-            onChange={(e) => setStartUnit(e.target.value)}
-            placeholder="مثال: 1ي"
-          />
+          <FolioInput value={startUnit} onChange={setStartUnit} folioCount={folioCount} />
         </div>
 
         <div className="field">
           <label>الورقة الأخيرة</label>
-          <input
-            className="input"
-            type="text"
-            value={endUnit}
-            onChange={(e) => setEndUnit(e.target.value)}
-            placeholder="مثال: 24س"
-          />
+          <FolioInput value={endUnit} onChange={setEndUnit} folioCount={folioCount} />
         </div>
       </div>
 
@@ -432,16 +453,6 @@ export function WorkForm({ volumeId, work, relationships, personMap, onSaved, on
       >
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: "var(--space-3)" }}>
           تاريخ النسخ (هجري)
-        </div>
-        <div className="field" style={{ marginBottom: "var(--space-3)" }}>
-          <label>التاريخ كما هو مكتوب</label>
-          <input
-            className="input"
-            type="text"
-            value={copyDateAsWritten}
-            onChange={(e) => setCopyDateAsWritten(e.target.value)}
-            placeholder="مثال: ربيع الأول سنة 1200"
-          />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
           <div className="field">

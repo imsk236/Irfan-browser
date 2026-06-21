@@ -255,7 +255,9 @@ export function VolumesScreen() {
                   </div>
                   <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>
                     {repoName(v.repository_id)}
-                    {v.repository_volume_number != null && ` · ${v.repository_volume_number}`}
+                    {v.repository_volume_number != null && (
+                      <div>رقم المجلد: {v.repository_volume_number}</div>
+                    )}
                   </div>
                 </li>
               ))}
@@ -311,13 +313,6 @@ export function VolumesScreen() {
                   <span className="serial-badge" style={{ fontSize: 18 }}>
                     {selected.serial}
                   </span>
-                  {selected.repository_volume_number != null && (
-                    <span
-                      style={{ marginRight: "var(--space-3)", color: "var(--color-text-muted)", fontSize: 14 }}
-                    >
-                      رقم المجلد في الخزانة: {selected.repository_volume_number}
-                    </span>
-                  )}
                 </div>
                 <button
                   className="btn btn-secondary btn-compact"
@@ -329,6 +324,9 @@ export function VolumesScreen() {
               <div style={{ fontSize: 14, color: "var(--color-text-muted)", marginBottom: "var(--space-2)" }}>
                 الخزانة: {repoName(selected.repository_id)}
                 {selected.folio_count && ` · ${selected.folio_count} ورقة`}
+                {selected.repository_volume_number != null && (
+                  <div>رقم المجلد: {selected.repository_volume_number}</div>
+                )}
               </div>
               {selected.notes && (
                 <p style={{ fontSize: 14, maxWidth: 640, lineHeight: 1.7 }}>{selected.notes}</p>
@@ -363,6 +361,7 @@ export function VolumesScreen() {
                   work={editingWork}
                   relationships={workRelationships}
                   personMap={personMap}
+                  folioCount={selected.folio_count}
                   onSaved={handleWorkSaved}
                   onCancel={() => {
                     setShowWorkForm(false);
@@ -461,6 +460,7 @@ export function VolumesScreen() {
                   works={works}
                   personMap={personMap}
                   annotation={editingAnnotation}
+                  folioCount={selected.folio_count}
                   onSaved={handleAnnotationSaved}
                   onCancel={() => {
                     setShowAnnotationForm(false);

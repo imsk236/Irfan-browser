@@ -19,3 +19,6 @@
 | الرقم التسلسلي / السيريال | Serial | Human-readable `PPPP-DDDD` badge. Auto-generated; never hand-typed. |
 | شاهد / كما هو مكتوب | Witness (`as_written`) | Verbatim transcription from the page. Immutable evidence. |
 | تفسير / تأويل | Interpretation | A researcher conclusion drawn from a witness. No confidence level — confidence tracking has been removed from the data model. |
+| ورقة (pl. أوراق) | Folio | A leaf of a manuscript. Each ورقة has two faces: **يمين** (right face, the one you encounter first in RTL reading) and **يسار** (left face). Physical order: 1ي → 1س → 2ي → 2س … Encoded in the system as `{n}ي` or `{n}س` (e.g. `15ي`, `24س`). |
+| يمين / يسار | Recto / verso (folio face) | The two faces of a ورقة. يمين always precedes يسار on the same folio number. In all folio input widgets, يمين is the default selection and the dropdown is dimmed until a folio number is entered. |
+| موضع اللوحة | Folio location (annotation) | A single folio face reference on a قيد, encoded as `{n}ي` or `{n}س`. Not a range. |

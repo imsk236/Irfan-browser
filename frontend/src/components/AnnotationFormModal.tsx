@@ -3,6 +3,7 @@ import { annotationsApi, relationshipsApi } from "../api";
 import type { Annotation, Work } from "../api/types";
 import { VocabSelect } from "./VocabSelect";
 import { PersonField } from "./PersonField";
+import { FolioInput } from "./FolioInput";
 
 interface SelectedPerson {
   person_id: number;
@@ -27,6 +28,7 @@ interface Props {
   works: Work[];
   personMap: Map<number, string>;
   annotation: Annotation | null;
+  folioCount?: number | null;
   onSaved: () => void;
   onCancel: () => void;
 }
@@ -36,6 +38,7 @@ export function AnnotationFormModal({
   works,
   personMap,
   annotation,
+  folioCount,
   onSaved,
   onCancel,
 }: Props) {
@@ -88,6 +91,13 @@ export function AnnotationFormModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (folioCount && imageLocation) {
+      const m = imageLocation.match(/^(\d+)/);
+      if (m && parseInt(m[1]) > folioCount) {
+        setError(`رقم الورقة (${m[1]}) يتجاوز عدد الأوراق (${folioCount})`);
+        return;
+      }
+    }
     setSaving(true);
     try {
       let saved: Annotation;
@@ -177,13 +187,7 @@ export function AnnotationFormModal({
 
             <div className="field">
               <label>موضع اللوحة</label>
-              <input
-                className="input"
-                type="text"
-                value={imageLocation}
-                onChange={(e) => setImageLocation(e.target.value)}
-                placeholder="مثال: 15ي"
-              />
+              <FolioInput value={imageLocation} onChange={setImageLocation} folioCount={folioCount} />
             </div>
           </div>
 

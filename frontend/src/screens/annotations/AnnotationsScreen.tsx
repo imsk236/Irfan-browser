@@ -100,6 +100,7 @@ export function AnnotationsScreen() {
                 works={works}
                 personMap={personMap}
                 annotation={editingAnnotation}
+                folioCount={selectedVolume.folio_count}
                 onSaved={handleAnnotationSaved}
                 onCancel={() => {
                   setShowForm(false);
