@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { volumesApi } from "../api";
 import { VocabSelect } from "./VocabSelect";
+import { ErrorModal } from "./ErrorModal";
 import type { Repository } from "../api/types";
 
 interface Props {
@@ -21,7 +22,11 @@ export function RepoFormModal({ repo, onSaved, onCancel }: Props) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!isEdit && !/^\d{4}$/.test(placeKey)) {
-      setError("مفتاح الخزانة يجب أن يكون 4 أرقام");
+      setError("مفتاح الخزانة يجب أن يكون 4 أرقام بالضبط");
+      return;
+    }
+    if (!name.trim()) {
+      setError("اسم الخزانة مطلوب");
       return;
     }
     setSaving(true);
@@ -54,11 +59,7 @@ export function RepoFormModal({ repo, onSaved, onCancel }: Props) {
           {isEdit ? "تعديل الخزانة" : "خزانة جديدة"}
         </h2>
         <form onSubmit={submit}>
-          {error && (
-            <p style={{ color: "var(--color-error)", fontSize: 14, marginBottom: "var(--space-3)" }}>
-              {error}
-            </p>
-          )}
+          {error && <ErrorModal message={error} onClose={() => setError("")} />}
 
           {isEdit ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { volumesApi } from "../../api";
 import { RepoFormModal } from "../../components/RepoFormModal";
+import { ErrorModal } from "../../components/ErrorModal";
 import type { Volume, Repository } from "../../api/types";
 
 interface Props {
@@ -24,6 +25,28 @@ export function VolumeForm({ repos, volume, onSaved, onCancel }: Props) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!repositoryId) {
+      setError("يجب اختيار الخزانة");
+      return;
+    }
+    if (!folioCount) {
+      setError("عدد الأوراق مطلوب");
+      return;
+    }
+    const folioCountInt = parseInt(folioCount);
+    if (isNaN(folioCountInt) || folioCountInt < 1) {
+      setError("عدد الأوراق يجب أن يكون رقماً صحيحاً موجباً");
+      return;
+    }
+    if (repositoryVolumeNumber) {
+      const rvn = parseInt(repositoryVolumeNumber);
+      if (isNaN(rvn) || rvn < 1) {
+        setError("رقم المجلد في الخزانة يجب أن يكون رقماً صحيحاً موجباً");
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       if (volume) {
@@ -60,9 +83,7 @@ export function VolumeForm({ repos, volume, onSaved, onCancel }: Props) {
       <form onSubmit={submit}>
         <h3 style={{ marginBottom: "var(--space-4)" }}>{volume ? "تعديل المجلد" : "مجلد جديد"}</h3>
 
-        {error && (
-          <p style={{ color: "var(--color-error)", marginBottom: "var(--space-3)", fontSize: 14 }}>{error}</p>
-        )}
+        {error && <ErrorModal message={error} onClose={() => setError("")} />}
 
         {/* Serial display (read-only) */}
         {volume && (
@@ -116,7 +137,7 @@ export function VolumeForm({ repos, volume, onSaved, onCancel }: Props) {
           </div>
 
           <div className="field">
-            <label>عدد الأوراق</label>
+            <label>عدد الأوراق <span style={{ color: "var(--color-error)" }}>*</span></label>
             <input
               className="input"
               type="number"

@@ -5,6 +5,7 @@ import { VocabSelect } from "./VocabSelect";
 import { PersonField } from "./PersonField";
 import { PersonFormModal } from "./PersonFormModal";
 import { FolioInput } from "./FolioInput";
+import { ErrorModal } from "./ErrorModal";
 
 interface SelectedPerson {
   person_id: number;
@@ -94,6 +95,10 @@ export function AnnotationFormModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (!annotationType) {
+      setError("نوع القيد مطلوب");
+      return;
+    }
     if (folioCount && imageLocation) {
       const m = imageLocation.match(/^(\d+)/);
       if (m && parseInt(m[1]) > folioCount) {
@@ -163,11 +168,7 @@ export function AnnotationFormModal({
         <h2 className="modal-title">{annotation ? "تعديل القيد" : "قيد جديد"}</h2>
 
         <form onSubmit={submit}>
-          {error && (
-            <p style={{ color: "var(--color-error)", fontSize: 14, marginBottom: "var(--space-3)" }}>
-              {error}
-            </p>
-          )}
+          {error && <ErrorModal message={error} onClose={() => setError("")} />}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
             <div className="field">

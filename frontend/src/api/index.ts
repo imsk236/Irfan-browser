@@ -41,8 +41,14 @@ export const worksApi = {
   create: (body: {
     volume_id: number;
     title: string;
+    title_source?: string;
+    incipit?: string;
+    explicit?: string;
+    topic_category?: string;
+    topic_subcategory?: string;
     start_unit?: string;
     end_unit?: string;
+    copy_place?: string;
     copy_date_as_written?: string;
     copy_year?: number;
     copy_month?: string;

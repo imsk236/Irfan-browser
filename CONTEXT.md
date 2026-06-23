@@ -8,6 +8,8 @@
 | مؤلف / ناسخ at work level | Author / Scribe (work-level) | Both are required on every عنوان — the researcher must explicitly choose a known person or select **مجهول** before saving. Cannot be left blank. Each carries a مصدر المعرفة. |
 | منسوخ له at work level | Copy recipient (work-level) | Optional work-level role. The person for whom this copy was made, when stated in the colophon. |
 | مصدر المعرفة | Evidence source (how we know) | Replaces the old `evidence_source` vocab for work-level relationships. Initial values: المجلد، مصدر خارجي، المفهرس. Admin-extendable in settings. |
+| مصدر العنوان | Title source | How the cataloguer determined the title of the عنوان. Same three radio options as مصدر المعرفة (المخطوط، المفهرس، مرجع آخر). Stored as `title_source` on the `works` table. |
+| مكان النسخ | Copy place (work-level) | The Omani wilaya where this copy was made. Single value: either a specific wilaya, **مجهول**, **خارج عُمان**, or unset (not recorded). Stored as `copy_place` on the `works` table. |
 | تاريخ النسخ | Copying date (work-level) | Structured Hijri date on عنوان. Five components, all required with مجهول option (stored as NULL in DB): السنة (INTEGER), الشهر (TEXT — 12 fixed Hijri months), التاريخ (INTEGER 1–30, day of month), اليوم (TEXT — 7 fixed weekdays), الوقت (TEXT — admin-extendable vocab dropdown, add/delete in settings). Plus: التاريخ كما هو مكتوب (TEXT witness, verbatim). |
 | مجلد (pl. مجلدات) | Volume | A physical manuscript codex. |
 | قيد (pl. قيود) | Annotation | A physical inscription on the manuscript (ownership mark, reading certificate, etc.). Stored in `annotations` table. Date fields dropped. Work link labeled **العنوان**, dropdown with **ليس مرتبط بعنوان معين** as default. Person relationships at the volume level are always entered through a قيد — there is no standalone "الأشخاص المرتبطون" section on the volume. The قيد form allows adding multiple persons, each with a role selected from a dropdown (مالك، واقف، مذكور، etc.). No conditional filtering by قيد type — same role dropdown always available. All person relationships (whether from عنوان or قيد) must appear together in the trace/search screen. |
@@ -17,6 +19,9 @@
 | رقم المجلد في الخزانة | Repository volume number | The integer reference the external library physically put on the manuscript (`repository_volume_number` in DB). Always a plain integer. |
 | الرقم التسلسلي | Serial | Read-only PPPP-DDDD badge assembled from مفتاح الخزانة + رقم الخزنة. Never hand-typed. |
 | الرقم التسلسلي / السيريال | Serial | Human-readable `PPPP-DDDD` badge. Auto-generated; never hand-typed. |
+| المطلع | Incipit | Verbatim opening words of the work as written in the manuscript. A witness field (`as_written`). Used to identify the work when the title is absent or ambiguous. |
+| الخاتمة | Explicit | Verbatim closing words of the work as written in the manuscript. A witness field (`as_written`). |
+| التصنيف الموضوعي | Subject classification | A two-level topic assigned to a عنوان: التقسيم العام (one of 12 main categories) and التقسيم الفرعي (subcategory within that category). Single classification per عنوان — no multi-tagging. |
 | شاهد / كما هو مكتوب | Witness (`as_written`) | Verbatim transcription from the page. Immutable evidence. |
 | تفسير / تأويل | Interpretation | A researcher conclusion drawn from a witness. No confidence level — confidence tracking has been removed from the data model. |
 | ورقة (pl. أوراق) | Folio | A leaf of a manuscript. Each ورقة has two faces: **يمين** (right face, the one you encounter first in RTL reading) and **يسار** (left face). Physical order: 1ي → 1س → 2ي → 2س … Encoded in the system as `{n}ي` or `{n}س` (e.g. `15ي`, `24س`). |

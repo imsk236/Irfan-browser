@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { worksApi, relationshipsApi } from "../../api";
+import { useState, useEffect } from "react";
+import { worksApi, relationshipsApi, vocabApi } from "../../api";
+import { ErrorModal } from "../../components/ErrorModal";
 import { VocabSelect } from "../../components/VocabSelect";
 import { PersonField } from "../../components/PersonField";
 import { PersonFormModal } from "../../components/PersonFormModal";
@@ -7,6 +8,21 @@ import { FolioInput } from "../../components/FolioInput";
 import type { Person, Relationship, Work } from "../../api/types";
 
 const SOURCE_SENTINELS = ["المخطوط", "المفهرس"] as const;
+
+const TOPIC_TAXONOMY: Record<string, string[]> = {
+  "القرآن وعلومه": ["المصاحف", "أصول التفسير", "التفسير", "القراءات", "التجويد", "غريب القرآن", "إعراب القرآن", "رسم المصاحف"],
+  "الحديث وعلومه": ["كتب الحديث", "شروح الحديث", "علم الرجال", "مصطلح الحديث", "غريب الحديث", "علوم الحديث"],
+  "العقائد وأصول الدين": ["التوحيد وعلم الكلام", "مقالات الفرق", "الملل والنحل"],
+  "الفقه وأصوله": ["الفقه العام", "أصول الفقه", "فقه المذاهب"],
+  "اللغة العربية": ["المعاجم", "فقه اللغة", "النحو", "الصرف", "البلاغة", "العروض والقوافي", "الرسم والإملاء"],
+  "الآداب": ["الشعر", "الرسائل", "الخطابة", "التقاريظ", "المقامات", "النقد", "شروح القصائد", "الأمثال", "الدراسات الأدبية", "الحكايات والملاحم", "الأحاجي والنوادر", "المذكرات"],
+  "التاريخ والجغرافية": ["التاريخ العام", "التاريخ الخاص", "السيرة النبوية", "قصص الأنبياء", "التراجم", "السير", "الأنساب", "الرحلات", "جغرافية البلدان", "الخطط"],
+  "العلوم البحتة": ["الرياضيات", "الفيزياء", "الكيمياء", "الفلك", "الملاحة البحرية", "الميقات", "علوم الأرض والمناخ", "علم الإنسان", "علم النبات", "علم الحيوان"],
+  "العلوم التطبيقية": ["الطب", "الهندسة", "الزراعة", "تدبير المنزل", "الإدارة", "الصناعات", "البيطرة"],
+  "الفلسفة والعلوم المتصلة بها": ["الفلسفة", "علم النفس", "علم المنطق", "آداب البحث والمناظرة", "الأخلاق", "السلوك", "التصوف", "الرقائق والمواعظ", "الأدعية والأذكار", "الخطب", "الفضائل"],
+  "العلوم الاجتماعية": ["الاجتماع", "الأوزان والمكاييل", "الفنون العسكرية", "السياسة الشرعية", "التربية والتعليم", "النقود", "الحسبة", "السجلات"],
+  "المعارف العامة والفنون": ["الفهرسة الوصفية (الببليوغرافيا)", "الفهارس", "كتب المختارات", "الحروف والأوفاق", "الرمل", "النجوم", "تعبير الرؤيا", "الفنون", "الخط وآلاته", "البيزرة", "الكتب المقدسة", "الديانات", "اللغات الأخرى", "المعارف العامة"],
+};
 
 function folioToInt(encoded: string): number | null {
   const m = encoded.match(/^(\d+)([يس])$/);
@@ -32,16 +48,30 @@ interface Props {
 
 export function WorkForm({ volumeId, work, relationships, personMap, folioCount, onSaved, onCancel }: Props) {
   const [title, setTitle] = useState(work?.title ?? "");
+  const [titleSource, setTitleSource] = useState(work?.title_source ?? "");
+  const [titleCustom, setTitleCustom] = useState(
+    !!work?.title_source && !SOURCE_SENTINELS.includes(work.title_source as typeof SOURCE_SENTINELS[number])
+  );
+  const [incipit, setIncipit] = useState(work?.incipit ?? "");
+  const [explicit, setExplicit] = useState(work?.explicit ?? "");
+  const [topicCategory, setTopicCategory] = useState(work?.topic_category ?? "");
+  const [topicSubcategory, setTopicSubcategory] = useState(work?.topic_subcategory ?? "");
   const [startUnit, setStartUnit] = useState(work?.start_unit ?? "");
   const [endUnit, setEndUnit] = useState(work?.end_unit ?? "");
   const [notes, setNotes] = useState(work?.notes ?? "");
 
-  // Copy date fields
+  // Copy place + date fields
+  const [copyPlace, setCopyPlace] = useState(work?.copy_place ?? "");
+  const [wilayaOptions, setWilayaOptions] = useState<string[]>([]);
   const [copyYear, setCopyYear] = useState(work?.copy_year?.toString() ?? "");
   const [copyMonth, setCopyMonth] = useState(work?.copy_month ?? "");
   const [copyDay, setCopyDay] = useState(work?.copy_day?.toString() ?? "");
   const [copyWeekday, setCopyWeekday] = useState(work?.copy_weekday ?? "");
   const [copyTime, setCopyTime] = useState(work?.copy_time ?? "");
+
+  useEffect(() => {
+    vocabApi.list("wilaya").then(setWilayaOptions).catch(() => setWilayaOptions([]));
+  }, []);
 
   // Author (مؤلف)
   const existingAuthorRel = work && relationships
@@ -81,6 +111,35 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!title.trim()) {
+      setError("العنوان مطلوب");
+      return;
+    }
+
+    // Copy date coherence: day requires month, month requires year
+    if (copyDay && !copyMonth) {
+      setError("لا يمكن إدخال التاريخ بدون شهر");
+      return;
+    }
+    if (copyMonth && !copyYear) {
+      setError("لا يمكن إدخال الشهر بدون سنة");
+      return;
+    }
+    if (copyYear) {
+      const yr = parseInt(copyYear);
+      if (isNaN(yr) || yr < 1 || yr > 1500) {
+        setError("السنة الهجرية يجب أن تكون بين 1 و 1500");
+        return;
+      }
+    }
+    if (copyDay) {
+      const d = parseInt(copyDay);
+      if (isNaN(d) || d < 1 || d > 30) {
+        setError("التاريخ يجب أن يكون بين 1 و 30");
+        return;
+      }
+    }
 
     // Validate مؤلف: must pick a person OR check مجهول
     if (!work || replaceAuthor) {
@@ -129,7 +188,13 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
       let savedWork: Work;
       const workPayload = {
         title,
+        title_source: titleSource || undefined,
+        incipit: incipit || undefined,
+        explicit: explicit || undefined,
+        topic_category: topicCategory || undefined,
+        topic_subcategory: topicSubcategory || undefined,
         start_unit: startUnit || undefined,
+        copy_place: copyPlace || undefined,
         end_unit: endUnit || undefined,
         copy_year: copyYear ? parseInt(copyYear) : undefined,
         copy_month: copyMonth || undefined,
@@ -367,11 +432,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         {work ? "تعديل العنوان" : "عنوان جديد"}
       </h4>
 
-      {error && (
-        <p style={{ color: "var(--color-error)", marginBottom: "var(--space-3)", fontSize: 14 }}>
-          {error}
-        </p>
-      )}
+      {error && <ErrorModal message={error} onClose={() => setError("")} />}
 
       {/* العنوان والأوراق */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
@@ -386,6 +447,70 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
             onChange={(e) => setTitle(e.target.value)}
             required
           />
+          {title.trim() && (
+            <div className="field" style={{ marginTop: "var(--space-3)" }}>
+              <label style={{ fontSize: 12, color: "var(--color-text-muted)" }}>مصدر العنوان</label>
+              <div style={{ display: "flex", gap: "var(--space-5)", marginTop: "var(--space-1)" }}>
+                {(["المخطوط", "المفهرس", "مرجع آخر"] as const).map((opt) => {
+                  const selectedOption = SOURCE_SENTINELS.includes(titleSource as typeof SOURCE_SENTINELS[number])
+                    ? titleSource
+                    : titleCustom ? "مرجع آخر" : null;
+                  return (
+                    <label key={opt} style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", fontSize: 13, cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="title-source"
+                        checked={selectedOption === opt}
+                        onChange={() => {
+                          if (opt === "مرجع آخر") {
+                            setTitleCustom(true);
+                            if (SOURCE_SENTINELS.includes(titleSource as typeof SOURCE_SENTINELS[number])) setTitleSource("");
+                          } else {
+                            setTitleCustom(false);
+                            setTitleSource(opt);
+                          }
+                        }}
+                      />
+                      {opt}
+                    </label>
+                  );
+                })}
+              </div>
+              {titleCustom && (
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="اذكر المرجع…"
+                  value={SOURCE_SENTINELS.includes(titleSource as typeof SOURCE_SENTINELS[number]) ? "" : titleSource}
+                  onChange={(e) => setTitleSource(e.target.value)}
+                  style={{ marginTop: "var(--space-2)" }}
+                  autoFocus
+                />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* المطلع — witness field: muted label, secondary visual weight */}
+        <div className="field" style={{ gridColumn: "1 / -1" }}>
+          <label style={{ fontSize: "var(--font-size-meta)", color: "var(--color-text-muted)" }}>المطلع</label>
+          <textarea
+            className="textarea"
+            value={incipit}
+            onChange={(e) => setIncipit(e.target.value)}
+            placeholder="أول كلمات النص كما هي مكتوبة…"
+          />
+        </div>
+
+        {/* الخاتمة — witness field: muted label, secondary visual weight */}
+        <div className="field" style={{ gridColumn: "1 / -1" }}>
+          <label style={{ fontSize: "var(--font-size-meta)", color: "var(--color-text-muted)" }}>الخاتمة</label>
+          <textarea
+            className="textarea"
+            value={explicit}
+            onChange={(e) => setExplicit(e.target.value)}
+            placeholder="آخر كلمات النص كما هي مكتوبة…"
+          />
         </div>
 
         <div className="field">
@@ -396,6 +521,53 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         <div className="field">
           <label>الورقة الأخيرة</label>
           <FolioInput value={endUnit} onChange={setEndUnit} folioCount={folioCount} />
+        </div>
+      </div>
+
+      {/* التصنيف الموضوعي */}
+      <div
+        style={{
+          marginBottom: "var(--space-4)",
+          padding: "var(--space-3)",
+          background: "var(--color-surface-muted)",
+          borderRadius: "var(--radius)",
+          border: "1px solid var(--color-border)",
+        }}
+      >
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: "var(--space-3)" }}>
+          التصنيف الموضوعي
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+          <div className="field">
+            <label>التقسيم العام</label>
+            <select
+              className="select"
+              value={topicCategory}
+              onChange={(e) => {
+                setTopicCategory(e.target.value);
+                setTopicSubcategory("");
+              }}
+            >
+              <option value="">— اختر —</option>
+              {Object.keys(TOPIC_TAXONOMY).map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>التقسيم الفرعي</label>
+            <select
+              className="select"
+              value={topicSubcategory}
+              onChange={(e) => setTopicSubcategory(e.target.value)}
+              disabled={!topicCategory}
+            >
+              <option value="">— اختر —</option>
+              {(TOPIC_TAXONOMY[topicCategory] ?? []).map((sub) => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -533,7 +705,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         }}
       >
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: "var(--space-3)" }}>
-          تاريخ النسخ (هجري)
+          بيانات النسخ
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
           <div className="field">
@@ -586,6 +758,21 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
               onChange={setCopyTime}
               placeholder="مجهول"
             />
+          </div>
+          <div className="field" style={{ gridColumn: "1 / -1" }}>
+            <label>مكان النسخ</label>
+            <select
+              className="select"
+              value={copyPlace}
+              onChange={(e) => setCopyPlace(e.target.value)}
+            >
+              <option value="">— غير محدد —</option>
+              <option value="مجهول">مجهول</option>
+              <option value="خارج عُمان">خارج عُمان</option>
+              {wilayaOptions.map((w) => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>

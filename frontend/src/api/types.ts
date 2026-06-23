@@ -20,8 +20,14 @@ export interface Work {
   id: number;
   volume_id: number;
   title: string;
+  title_source: string | null;
+  incipit: string | null;
+  explicit: string | null;
+  topic_category: string | null;
+  topic_subcategory: string | null;
   start_unit: string | null;
   end_unit: string | null;
+  copy_place: string | null;
   copy_date_as_written: string | null;
   copy_year: number | null;
   copy_month: string | null;

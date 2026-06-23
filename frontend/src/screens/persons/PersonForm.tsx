@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { personsApi, vocabApi } from "../../api";
 import type { Person } from "../../api/types";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { ErrorModal } from "../../components/ErrorModal";
 
 interface Props {
   person: Person | null;
@@ -177,6 +178,12 @@ export function PersonForm({ person, initialName, onSaved, onDeleted, onCancel }
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!preferredName.trim()) {
+      setError("الاسم المعتمد مطلوب");
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -218,11 +225,7 @@ export function PersonForm({ person, initialName, onSaved, onDeleted, onCancel }
         {person ? "تعديل السجل" : "شخص جديد"}
       </h2>
 
-      {error && (
-        <p style={{ color: "var(--color-error)", marginBottom: "var(--space-3)", fontSize: 14 }}>
-          {error}
-        </p>
-      )}
+      {error && <ErrorModal message={error} onClose={() => setError("")} />}
 
       {/* الاسم المعتمد */}
       <div className="field">

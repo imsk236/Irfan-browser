@@ -112,11 +112,18 @@ class Work(Base):
     id = Column(Integer, primary_key=True)
     volume_id = Column(Integer, ForeignKey("volumes.id"), nullable=False)
     title = Column(Text, nullable=False)
+    title_source = Column(Text)
+    incipit = Column(Text)
+    explicit = Column(Text)
     start_unit = Column(Text)
     end_unit = Column(Text)
     notes = Column(Text)
 
     # Structured Hijri copy date — all nullable (NULL = مجهول, researcher must explicitly choose)
+    topic_category = Column(Text)
+    topic_subcategory = Column(Text)
+
+    copy_place = Column(Text)
     copy_date_as_written = Column(Text)   # verbatim witness from the manuscript
     copy_year = Column(Integer)
     copy_month = Column(Text)             # one of the 12 Hijri month names
