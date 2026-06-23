@@ -3,7 +3,7 @@ import type {
   Repository, Volume, Work, Annotation, Person, PersonMatch,
   NameVariant, Relationship, TraceResult, Appearance,
   DashboardStats, ActivityCalendar, DayDetail, RecentEdit,
-  ActionableCounts, RepositoryCount,
+  ActionableCounts, RepositoryCount, WilayaTraceResult,
 } from "./types";
 
 // Repositories & Volumes
@@ -119,6 +119,8 @@ export const relationshipsApi = {
 export const traceApi = {
   trace: (personId: number) =>
     api.get<TraceResult[]>(`/trace/${personId}`),
+  traceWilaya: (wilayaName: string) =>
+    api.get<WilayaTraceResult>(`/trace/wilaya?name=${encodeURIComponent(wilayaName)}`),
 };
 
 // Vocab
