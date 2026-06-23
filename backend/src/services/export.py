@@ -76,7 +76,8 @@ def export_json(output_path: str) -> str:
 
     engine = get_engine()
     inspector = inspect(engine)
-    table_names = inspector.get_table_names()
+    _skip = {"alembic_version"}
+    table_names = [t for t in inspector.get_table_names() if t not in _skip]
 
     dump: dict[str, list[dict]] = {}
     with engine.connect() as conn:
