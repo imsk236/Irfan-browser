@@ -1,20 +1,31 @@
 :root {
-  /* ── Color tokens (ui_style_guide §3.1) ── */
-  --color-primary-700: #526B2D;
-  --color-primary-600: #667F3A;
-  --color-primary-100: #F1F4EA;
-  --color-page: #FAF9F5;
+  /* ── Content-area colors ── */
+  --color-primary-700: #4B6426;
+  --color-primary-600: #5E7B31;
+  --color-primary-100: #EBF0DF;
+  --color-page: #F3F2EE;
   --color-surface: #FFFFFF;
-  --color-surface-muted: #F7F6F2;
-  --color-text: #252720;
-  --color-text-muted: #7D8076;
-  --color-border: #DDDED8;
-  --color-border-strong: #C9CBC3;
-  --color-danger: #9B3D2E;
-  --color-warning: #B5832E;
-  --color-info: #56636A;
+  --color-surface-muted: #EDECE8;
+  --color-text: #1C1D18;
+  --color-text-muted: #6E7168;
+  --color-border: #DDDBD5;
+  --color-border-strong: #C4C2BA;
+  --color-danger: #C0392B;
+  --color-warning: #A0711E;
+  --color-info: #4A5F67;
 
-  /* Backward-compat aliases used by existing component CSS */
+  /* ── Navigation sidebar (dark forest olive) ── */
+  --color-nav-bg: #18230F;
+  --color-nav-text: rgba(195, 215, 165, 0.60);
+  --color-nav-text-active: #D0E5A8;
+  --color-nav-hover: rgba(255, 255, 255, 0.055);
+  --color-nav-active: rgba(255, 255, 255, 0.10);
+  --color-nav-accent: #8BB552;
+  --color-nav-divider: rgba(255, 255, 255, 0.07);
+  --color-nav-brand-ar: #C8DFA0;
+  --color-nav-brand-en: rgba(195, 215, 165, 0.42);
+
+  /* Backward-compat aliases */
   --color-primary: var(--color-primary-700);
   --color-highlight: var(--color-primary-600);
   --color-bg: var(--color-page);
@@ -25,7 +36,7 @@
   --color-focus-outline: var(--color-primary-700);
   --color-disabled-text: #a0a59a;
 
-  /* ── Spacing scale (ui_style_guide §3.3) ── */
+  /* ── Spacing scale ── */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -36,34 +47,35 @@
   --space-8: 40px;
   --space-9: 48px;
 
-  /* ── Typography (ui_style_guide §4.2) ── */
+  /* ── Typography ── */
   --font-family: "IBM Plex Sans Arabic", "Noto Sans Arabic", sans-serif;
-  --font-size-title: 26px;
-  --font-size-section: 18px;
-  --font-size-panel: 16px;
-  --font-size-body: 15px;
-  --font-size-label: 14px;
-  --font-size-meta: 13px;
+  --font-size-title: 22px;
+  --font-size-section: 17px;
+  --font-size-panel: 15px;
+  --font-size-body: 14px;
+  --font-size-label: 13px;
+  --font-size-meta: 12px;
   --line-height-body: 1.75;
 
-  /* ── Radius tokens (ui_style_guide §3.4) ── */
+  /* ── Radius ── */
   --radius-sm: 4px;
   --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-lg: 10px;
   --radius: var(--radius-md);
 
   /* ── Shadows ── */
-  --shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.10);
-  --shadow-dropdown: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.13);
+  --shadow-dropdown: 0 2px 12px rgba(0, 0, 0, 0.10);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
 
-  /* ── Motion tokens (ui_style_guide §3.5) ── */
+  /* ── Motion ── */
   --transition-fast: 120ms ease;
   --transition-standard: 160ms ease;
-  --transition-max: 180ms ease;
+  --transition-max: 200ms ease;
   --transition-normal: var(--transition-max);
 
   /* ── Layout ── */
-  --nav-width: 224px;
-  --header-height: 72px;
+  --nav-width: 210px;
+  --header-height: 0px;
   --content-max-width: 1280px;
 }

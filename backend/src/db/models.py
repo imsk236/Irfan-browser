@@ -154,7 +154,6 @@ class PersonRelationship(Base):
     volume_id = Column(Integer, ForeignKey("volumes.id"))
     work_id = Column(Integer, ForeignKey("works.id"))
     role = Column(Text, nullable=False)
-    confidence = Column(Text, nullable=False)
     evidence_source = Column(Text)
     evidence_annotation_id = Column(Integer, ForeignKey("annotations.id"))
     notes = Column(Text)
@@ -171,3 +170,15 @@ class PersonRelationship(Base):
             name="ck_person_relationships_level"
         ),
     )
+
+
+class ActivityLog(Base):
+    __tablename__ = "activity_log"
+
+    id = Column(Integer, primary_key=True)
+    commit_id = Column(Text, nullable=False)
+    occurred_at = Column(Text, nullable=False)   # ISO8601 UTC
+    table_name = Column(Text, nullable=False)
+    record_id = Column(Integer, nullable=False)
+    action = Column(Text, nullable=False)         # create | update | delete
+    label = Column(Text)                          # display hint: serial, title, name…

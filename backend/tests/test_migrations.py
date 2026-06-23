@@ -99,7 +99,7 @@ def test_upgrade_version_is_head(temp_db):
     engine.dispose()
 
     assert len(version) == 1
-    assert version[0][0] == "008_person_wilayas_nasab"
+    assert version[0][0] == "010_drop_confidence"
 
 
 def test_stamp_existing_db_then_upgrade(temp_db):
@@ -117,7 +117,7 @@ def test_stamp_existing_db_then_upgrade(temp_db):
     with engine.connect() as conn:
         version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
     engine.dispose()
-    assert version == "008_person_wilayas_nasab"
+    assert version == "010_drop_confidence"
 
 
 def test_downgrade_to_baseline_drops_new_columns(temp_db):

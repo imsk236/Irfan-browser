@@ -10,7 +10,6 @@ class TraceResultOut(BaseModel):
     relationship_id: int
     role: str
     level: str
-    confidence: str
     serial: str
     repository_volume_number: int | None
     work_id: int | None

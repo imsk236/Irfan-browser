@@ -1,63 +1,111 @@
-/* White right-edge sidebar (ui_style_guide §7) */
+/* Dark forest-olive sidebar */
 .nav-sidebar {
   width: var(--nav-width);
   min-height: 100%;
-  background: var(--color-surface);
-  border-left: 1px solid var(--color-border);
+  background: var(--color-nav-bg);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
 }
 
+/* Brand block at top of nav */
+.nav-brand {
+  padding: 28px var(--space-5) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+  border-bottom: 1px solid var(--color-nav-divider);
+  margin-bottom: var(--space-2);
+}
+
+.nav-logo-wrap {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.nav-logo {
+  display: block;
+  width: 90px;
+  height: 70px;
+  object-fit: contain;
+  /* invert(1): white bg → black (invisible via screen blend)
+     hue-rotate(190deg): olive strokes → sage-green
+     mix-blend-mode: screen makes the black bg disappear into the dark sidebar */
+  filter: invert(1) hue-rotate(190deg) brightness(0.85);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  user-select: none;
+}
+
+.nav-brand-ar {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-nav-brand-ar);
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.nav-brand-en {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--color-nav-brand-en);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin-top: 3px;
+}
+
 .nav-list {
   list-style: none;
-  padding: var(--space-3) 0;
+  padding: 0;
   flex: 1;
 }
 
-/* Navigation item (ui_style_guide §7.2) */
 .nav-item {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
-  padding: var(--space-4) var(--space-5);
-  min-height: 60px;
+  padding: 10px var(--space-5);
   background: transparent;
   border: none;
-  color: var(--color-text-muted);
+  color: var(--color-nav-text);
   font-size: var(--font-size-label);
-  font-weight: 500;
+  font-weight: 400;
   text-align: right;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
-  border-right: 3px solid transparent;
+  border-right: 2px solid transparent;
   font-family: var(--font-family);
+  transition: background var(--transition-fast), color var(--transition-fast);
+  line-height: 1.4;
 }
 
 .nav-item:hover {
-  background: var(--color-surface-muted);
-  color: var(--color-text);
+  background: var(--color-nav-hover);
+  color: rgba(195, 215, 165, 0.90);
 }
 
-/* Active: light olive tint + 3px olive right-edge marker */
 .nav-item.active {
-  background: var(--color-primary-100);
-  color: var(--color-primary-700);
-  border-right-color: var(--color-primary-700);
+  background: var(--color-nav-active);
+  color: var(--color-nav-text-active);
+  border-right-color: var(--color-nav-accent);
   font-weight: 600;
 }
 
 .nav-item:focus-visible {
-  outline: 2px solid var(--color-primary-700);
+  outline: 2px solid var(--color-nav-accent);
   outline-offset: -2px;
 }
 
 .nav-icon {
-  font-size: 18px;
-  width: 22px;
-  text-align: center;
   flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.nav-item.active .nav-icon {
+  opacity: 1;
 }
 
 .nav-label {

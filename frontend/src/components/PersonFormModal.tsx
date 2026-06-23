@@ -3,7 +3,9 @@ import type { Person } from "../api/types";
 
 interface Props {
   person: Person | null;
-  onSaved: () => void;
+  initialName?: string;
+  onSaved: (person: Person) => void;
+  onDeleted?: () => void;
   onCancel: () => void;
 }
 

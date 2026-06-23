@@ -87,7 +87,6 @@ export interface Relationship {
   work_id: number | null;
   volume_id: number | null;
   role: string;
-  confidence: string;
   evidence_source: string | null;
   evidence_annotation_id: number | null;
   notes: string | null;
@@ -97,7 +96,6 @@ export interface TraceResult {
   relationship_id: number;
   role: string;
   level: string;
-  confidence: string;
   serial: string;
   repository_volume_number: number | null;
   work_id: number | null;
@@ -110,12 +108,71 @@ export interface TraceResult {
   notes: string | null;
 }
 
+// ── Dashboard types ───────────────────────────────────────────────────────────
+
+export interface DashboardStats {
+  volumes: number;
+  works: number;
+  persons: number;
+  annotations: number;
+  repositories: number;
+}
+
+export interface ActivityDay {
+  date: string;   // YYYY-MM-DD Muscat local
+  count: number;  // distinct commit_ids (saves) that day
+}
+
+export interface ActivityCalendar {
+  days: ActivityDay[];
+}
+
+export interface ActivityEntry {
+  id: number;
+  table_name: string;
+  record_id: number;
+  action: string;  // create | update | delete
+  label: string | null;
+}
+
+export interface Commit {
+  commit_id: string;
+  occurred_at: string;
+  entries: ActivityEntry[];
+}
+
+export interface DayDetail {
+  date: string;
+  commits: Commit[];
+}
+
+export interface RecentEdit {
+  table_name: string;
+  record_id: number;
+  action: string;
+  label: string | null;
+  occurred_at: string;
+}
+
+export interface ActionableCounts {
+  incomplete_volumes: number;
+  incomplete_works: number;
+  weak_evidence: number;
+  orphan_persons: number;
+}
+
+export interface RepositoryCount {
+  id: number;
+  name: string;
+  place_key: string;
+  volume_count: number;
+}
+
 /** Returned by GET /persons/{id}/appearances */
 export interface Appearance {
   relationship_id: number;
   role: string;
   level: string;
-  confidence: string;
   serial: string;
   repository_volume_number: number | null;
   work_id: number | null;

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from ..db.engine import get_session
 from ..services import persons as svc
@@ -116,7 +116,6 @@ class AppearanceOut(BaseModel):
     relationship_id: int
     role: str
     level: str
-    confidence: str
     serial: str
     repository_volume_number: int | None
     work_id: int | None
@@ -130,7 +129,7 @@ class AppearanceOut(BaseModel):
 
 
 @router.get("/search", response_model=list[PersonMatchOut])
-def search_persons(q: str = "", limit: int = 10):
+def search_persons(q: str = "", limit: int = Query(default=10, le=50)):
     """Arabic-tolerant person search — the inline matcher used in all person fields."""
     with get_session() as session:
         candidates = svc.find_candidates(session, q, limit=limit)
@@ -170,6 +169,17 @@ def update_person(person_id: int, body: PersonUpdate):
         try:
             person = svc.update_person(session, person_id, **updates)
             return PersonOut.from_orm_with_wilayas(person)
+        except ResourceNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.delete("/{person_id}", status_code=204)
+def delete_person(person_id: int):
+    with get_session() as session:
+        try:
+            svc.delete_person(session, person_id)
         except ResourceNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
         except ValueError as e:

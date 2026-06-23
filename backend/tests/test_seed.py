@@ -9,7 +9,6 @@ from src.db.seed import seed_vocab, VOCAB_SEED, DEACTIVATED_CATEGORIES
 
 _ACTIVE_CATEGORIES = {
     "role",
-    "confidence",
     "knowledge_source",
     "annotation_type",
     "hijri_month",

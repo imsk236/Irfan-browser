@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { personsApi, vocabApi } from "../../api";
 import type { Person } from "../../api/types";
+import { ConfirmModal } from "../../components/ConfirmModal";
 
 interface Props {
   person: Person | null;
-  onSaved: () => void;
+  initialName?: string;
+  onSaved: (person: Person) => void;
+  onDeleted?: () => void;
   onCancel: () => void;
 }
 
@@ -131,8 +134,8 @@ function WilayaPicker({
   );
 }
 
-export function PersonForm({ person, onSaved, onCancel }: Props) {
-  const [preferredName, setPreferredName] = useState(person?.preferred_name ?? "");
+export function PersonForm({ person, initialName, onSaved, onDeleted, onCancel }: Props) {
+  const [preferredName, setPreferredName] = useState(person?.preferred_name ?? initialName ?? "");
   const [ism, setIsm] = useState(person?.ism ?? "");
   const [kunya, setKunya] = useState(person?.kunya ?? "");
   const [laqab, setLaqab] = useState(person?.laqab ?? "");
@@ -150,6 +153,8 @@ export function PersonForm({ person, onSaved, onCancel }: Props) {
   const [notes, setNotes] = useState(person?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     setPreferredName(person?.preferred_name ?? "");
@@ -199,7 +204,7 @@ export function PersonForm({ person, onSaved, onCancel }: Props) {
 
       await personsApi.setWilayas(saved.id, wilayas);
 
-      onSaved();
+      onSaved(saved);
     } catch (err) {
       setError(String(err));
     } finally {
@@ -369,7 +374,83 @@ export function PersonForm({ person, onSaved, onCancel }: Props) {
         <button type="button" className="btn btn-secondary" onClick={onCancel}>
           إلغاء
         </button>
+        {person && onDeleted && (
+          <button
+            type="button"
+            className="btn btn-danger"
+            style={{ marginInlineStart: "auto" }}
+            onClick={() => { setConfirmingDelete(true); setDeleteError(null); }}
+          >
+            حذف
+          </button>
+        )}
       </div>
+
+      {confirmingDelete && person && (
+        deleteError ? (
+          <ConfirmModal
+            title="تعذّر الحذف"
+            message={
+              <div
+                role="alert"
+                style={{
+                  background: "rgba(192, 57, 43, 0.06)",
+                  border: "1px solid rgba(192, 57, 43, 0.22)",
+                  borderRadius: "var(--radius)",
+                  padding: "var(--space-4)",
+                  display: "flex",
+                  gap: "var(--space-3)",
+                  alignItems: "flex-start",
+                  marginTop: "var(--space-1)",
+                }}
+              >
+                <span aria-hidden="true" style={{ fontSize: 22, color: "var(--color-danger)", flexShrink: 0, lineHeight: 1.3 }}>
+                  ⚠
+                </span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: "var(--font-size-body)", color: "var(--color-text)", lineHeight: "var(--line-height-body)", fontWeight: 500 }}>
+                    {deleteError}
+                  </p>
+                  <p style={{
+                    margin: 0,
+                    marginTop: "var(--space-3)",
+                    paddingTop: "var(--space-3)",
+                    borderTop: "1px solid rgba(192, 57, 43, 0.15)",
+                    fontSize: "var(--font-size-label)",
+                    color: "var(--color-text-muted)",
+                    lineHeight: 1.65,
+                  }}>
+                    راجع جدول «مواضع ظهور الشخص في الأرشيف» وأزل الصلات المرتبطة به من المجلدات أو الأعمال أولاً، ثم عُد لحذف الشخص.
+                  </p>
+                </div>
+              </div>
+            }
+            confirmLabel="حسناً، فهمت"
+            cancelLabel="إغلاق"
+            danger={false}
+            onConfirm={() => { setConfirmingDelete(false); setDeleteError(null); }}
+            onCancel={() => { setConfirmingDelete(false); setDeleteError(null); }}
+          />
+        ) : (
+          <ConfirmModal
+            title="حذف الشخص"
+            message={`هل أنت متأكد من حذف «${person.preferred_name}»؟ لا يمكن التراجع عن هذا الإجراء.`}
+            confirmLabel="نعم، احذف"
+            danger
+            onConfirm={async () => {
+              try {
+                await personsApi.delete(person.id);
+                setConfirmingDelete(false);
+                setDeleteError(null);
+                onDeleted?.();
+              } catch (err) {
+                setDeleteError(err instanceof Error ? err.message : String(err));
+              }
+            }}
+            onCancel={() => setConfirmingDelete(false)}
+          />
+        )
+      )}
     </form>
   );
 }

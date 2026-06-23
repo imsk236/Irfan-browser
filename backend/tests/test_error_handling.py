@@ -59,27 +59,9 @@ def test_invalid_role_in_relationship_returns_422(client):
             "level": "volume",
             "volume_id": vol_r.json()["id"],
             "role": "دور-مخترع",
-            "confidence": "مؤكد",
         },
     )
     assert r.status_code == 422
     assert "غير مقبولة" in r.json()["detail"]
 
 
-def test_invalid_confidence_in_relationship_returns_422(client):
-    """An unrecognised confidence value returns 422 with Arabic message."""
-    repo_r = client.post("/volumes/repositories", json={"place_key": "1006", "name": "م"})
-    vol_r = client.post("/volumes", json={"repository_id": repo_r.json()["id"]})
-    person_r = client.post("/persons", json={"preferred_name": "شخص"})
-    r = client.post(
-        "/relationships",
-        json={
-            "person_id": person_r.json()["id"],
-            "level": "volume",
-            "volume_id": vol_r.json()["id"],
-            "role": "مؤلف",
-            "confidence": "يقين-مخترع",
-        },
-    )
-    assert r.status_code == 422
-    assert "غير مقبولة" in r.json()["detail"]

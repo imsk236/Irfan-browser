@@ -2,6 +2,8 @@ import { api } from "./client";
 import type {
   Repository, Volume, Work, Annotation, Person, PersonMatch,
   NameVariant, Relationship, TraceResult, Appearance,
+  DashboardStats, ActivityCalendar, DayDetail, RecentEdit,
+  ActionableCounts, RepositoryCount,
 } from "./types";
 
 // Repositories & Volumes
@@ -95,6 +97,7 @@ export const personsApi = {
     api.put(`/persons/${id}/wilayas`, { wilayas }),
   appearances: (id: number) =>
     api.get<Appearance[]>(`/persons/${id}/appearances`),
+  delete: (id: number) => api.delete(`/persons/${id}`),
 };
 
 // Relationships
@@ -127,4 +130,14 @@ export const exportApi = {
     api.post<{ files: string[] }>("/export/csv", { output_dir: outputDir }),
   json: (outputDir: string) =>
     api.post<{ file: string }>("/export/json", { output_dir: outputDir }),
+};
+
+// Dashboard
+export const dashboardApi = {
+  stats: () => api.get<DashboardStats>("/dashboard/stats"),
+  activity: () => api.get<ActivityCalendar>("/dashboard/activity"),
+  dayDetail: (date: string) => api.get<DayDetail>(`/dashboard/activity/${date}`),
+  recent: (limit = 15) => api.get<RecentEdit[]>(`/dashboard/recent?limit=${limit}`),
+  actionable: () => api.get<ActionableCounts>("/dashboard/actionable"),
+  repositories: () => api.get<RepositoryCount[]>("/dashboard/repositories"),
 };

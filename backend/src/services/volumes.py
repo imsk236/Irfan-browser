@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from ..db.models import Volume, Repository, Work, Annotation, PersonRelationship
 from .errors import ResourceNotFoundError
+from .activity import log_activity
 
 _PLACE_KEY_RE = re.compile(r"^\d{4}$")
 _SERIAL_RE = re.compile(r"^[0-9]{4}-[0-9]{4}$")
@@ -27,6 +28,8 @@ def create_repository(
     _validate_place_key(place_key)
     repo = Repository(place_key=place_key, name=name, location=location, notes=notes)
     session.add(repo)
+    session.flush()
+    log_activity(session, "repositories", repo.id, "create", name)
     session.commit()
     session.refresh(repo)
     return repo
@@ -47,6 +50,7 @@ def update_repository(session: Session, repo_id: int, **kwargs) -> Repository:
         _validate_place_key(kwargs["place_key"])
     for k, v in kwargs.items():
         setattr(repo, k, v)
+    log_activity(session, "repositories", repo_id, "update", repo.name)
     session.commit()
     session.refresh(repo)
     return repo
@@ -63,7 +67,9 @@ def delete_repository(session: Session, repo_id: int) -> None:
         raise ValueError(
             f"لا يمكن حذف هذه الخزانة لأنها تحتوي على {vol_count} مجلد. احذف المجلدات أولاً."
         )
+    label = repo.name
     session.delete(repo)
+    log_activity(session, "repositories", repo_id, "delete", label)
     session.commit()
 
 
@@ -157,6 +163,12 @@ def create_volume(
     volume = session.execute(
         select(Volume).where(Volume.serial == serial)
     ).scalar_one()
+    # Volume is already committed via raw DBAPI. Log in a separate commit only
+    # when a commit_id is active — avoids touching the StaticPool shared
+    # connection in tests that run without a commit_id (e.g. concurrency test).
+    log_activity(session, "volumes", volume.id, "create", volume.serial)
+    if session.new:
+        session.commit()
     return volume
 
 
@@ -176,6 +188,7 @@ def update_volume(session: Session, volume_id: int, **kwargs) -> Volume:
     for key, value in kwargs.items():
         setattr(volume, key, value)
 
+    log_activity(session, "volumes", volume_id, "update", volume.serial)
     session.commit()
     session.refresh(volume)
     return volume
@@ -220,5 +233,7 @@ def delete_volume(session: Session, volume_id: int) -> None:
             f"لا يمكن حذف هذا المجلد لأنه مرتبط بـ {rel_count} شخص. أزل الروابط أولاً."
         )
 
+    label = volume.serial
     session.delete(volume)
+    log_activity(session, "volumes", volume_id, "delete", label)
     session.commit()

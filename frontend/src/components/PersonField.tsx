@@ -14,15 +14,18 @@ interface Props {
   onChange: (person: SelectedPerson | null) => void;
   /** When true: if the typed spelling differs from preferred_name, save it as a name variant */
   saveVariant?: boolean;
+  /** When provided, fires instead of inline quick-create — lets the parent open the full person form */
+  onRequestCreate?: (name: string) => void;
 }
 
-export function PersonField({ label, value, onChange, saveVariant }: Props) {
+export function PersonField({ label, value, onChange, saveVariant, onRequestCreate }: Props) {
   const [query, setQuery] = useState("");
   const [candidates, setCandidates] = useState<PersonMatch[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [confirmingNew, setConfirmingNew] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -43,6 +46,7 @@ export function PersonField({ label, value, onChange, saveVariant }: Props) {
 
   function handleInput(q: string) {
     setQuery(q);
+    setSearchError(null);
     setConfirmingNew(false);
     setActiveIndex(-1);
     if (value) onChange(null);
@@ -60,6 +64,9 @@ export function PersonField({ label, value, onChange, saveVariant }: Props) {
         const results = await personsApi.search(q);
         setCandidates(results);
         setOpen(true);
+      } catch {
+        setCandidates([]);
+        setSearchError('تعذّر البحث، حاول مرة أخرى');
       } finally {
         setLoading(false);
       }
@@ -102,12 +109,26 @@ export function PersonField({ label, value, onChange, saveVariant }: Props) {
     }
   }
 
+  function handleConfirmedCreate() {
+    const name = query.trim();
+    if (!name) return;
+    if (onRequestCreate) {
+      setOpen(false);
+      setCandidates([]);
+      setConfirmingNew(false);
+      setActiveIndex(-1);
+      onRequestCreate(name);
+    } else {
+      createNew();
+    }
+  }
+
   function handleCreateNewClick() {
     // Require explicit confirmation when candidates exist
     if (candidates.length > 0 && !confirmingNew) {
       setConfirmingNew(true);
     } else {
-      createNew();
+      handleConfirmedCreate();
     }
   }
 
@@ -164,6 +185,12 @@ export function PersonField({ label, value, onChange, saveVariant }: Props) {
         aria-label={label}
       />
 
+      {searchError && (
+        <p style={{ margin: 0, marginTop: 'var(--space-1)', fontSize: 'var(--font-size-meta)', color: 'var(--color-error)' }}>
+          {searchError}
+        </p>
+      )}
+
       {loading && (
         <span
           style={{
@@ -217,7 +244,7 @@ export function PersonField({ label, value, onChange, saveVariant }: Props) {
                   <button
                     type="button"
                     className="btn btn-primary btn-compact"
-                    onClick={createNew}
+                    onClick={handleConfirmedCreate}
                   >
                     نعم، أنشئ شخصاً جديداً
                   </button>

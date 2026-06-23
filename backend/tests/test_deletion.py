@@ -22,7 +22,7 @@ def populated(session):
     from src.services import persons as person_svc
     person = person_svc.create_person(session, preferred_name="شخص اختبار")
     rel = rel_svc.link_person_to_volume(
-        session, person.id, volume.id, role="مالك", confidence="مؤكد"
+        session, person.id, volume.id, role="مالك"
     )
 
     return {
@@ -49,7 +49,6 @@ def test_delete_annotation_blocked_when_used_as_evidence(session, populated):
         person.id,
         vol.id,
         role="مذكور",
-        confidence="محتمل",
         evidence_annotation_id=annotation.id,
     )
 
@@ -105,7 +104,7 @@ def test_delete_work_blocked_when_has_relationships(session, populated):
     """delete_work raises ValueError when work has person relationships."""
     work = populated["work"]
     person = populated["person"]
-    rel_svc.link_person_to_work(session, person.id, work.id, role="مؤلف", confidence="مؤكد")
+    rel_svc.link_person_to_work(session, person.id, work.id, role="مؤلف")
 
     with pytest.raises(ValueError, match="شخص"):
         work_svc.delete_work(session, work.id)
@@ -159,7 +158,7 @@ def test_delete_volume_blocked_when_has_relationships(session):
     volume = vol_svc.create_volume(session, repo.id)
     person = person_svc.create_person(session, "شخص آخر")
     rel_svc.link_person_to_volume(
-        session, person.id, volume.id, role="مالك", confidence="مؤكد"
+        session, person.id, volume.id, role="مالك"
     )
 
     with pytest.raises(ValueError, match="شخص"):

@@ -9,7 +9,6 @@ class TraceResult:
     relationship_id: int
     role: str
     level: str
-    confidence: str
     serial: str
     repository_volume_number: int | None
     work_id: int | None
@@ -67,7 +66,6 @@ def trace_scholar(session: Session, person_id: int) -> list[TraceResult]:
             relationship_id=rel.id,
             role=rel.role,
             level=rel.level,
-            confidence=rel.confidence,
             serial=serial,
             repository_volume_number=repository_volume_number,
             work_id=rel.work_id,

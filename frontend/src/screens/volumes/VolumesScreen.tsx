@@ -19,6 +19,7 @@ export function VolumesScreen() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [selected, setSelected] = useState<Volume | null>(null);
   const [loadError, setLoadError] = useState("");
+  const [search, setSearch] = useState("");
 
   const [works, setWorks] = useState<Work[]>([]);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -39,6 +40,15 @@ export function VolumesScreen() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const personMap = new Map(persons.map((p) => [p.id, p.preferred_name]));
+
+  const filteredVolumes = volumes.filter((v) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      v.serial.toLowerCase().includes(q) ||
+      (v.repository_volume_number != null && String(v.repository_volume_number).includes(q))
+    );
+  });
 
   useEffect(() => {
     Promise.all([
@@ -232,12 +242,22 @@ export function VolumesScreen() {
             + مجلد جديد
           </button>
         </div>
+        <div style={{ padding: "var(--space-3) var(--space-4)", borderBottom: "1px solid var(--color-border)", flexShrink: 0 }}>
+          <input
+            className="input"
+            type="text"
+            placeholder="بحث بالرمز أو الرقم…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: "100%" }}
+          />
+        </div>
         <div style={{ overflowY: "auto", flex: 1 }}>
-          {volumes.length === 0 ? (
-            <p className="empty-state">لا توجد مجلدات بعد.</p>
+          {filteredVolumes.length === 0 ? (
+            <p className="empty-state">{search.trim() ? "لا توجد نتائج" : "لا توجد مجلدات بعد."}</p>
           ) : (
             <ul style={{ listStyle: "none" }}>
-              {volumes.map((v) => (
+              {filteredVolumes.map((v) => (
                 <li
                   key={v.id}
                   onClick={() => selectVolume(v)}

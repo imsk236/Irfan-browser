@@ -26,13 +26,14 @@ export function ConfirmModal({
         <div className="modal-body">{message}</div>
         <div className="modal-actions">
           <button
+            type="button"
             className={`btn ${danger ? "btn-danger" : "btn-primary"}`}
             onClick={onConfirm}
             autoFocus
           >
             {confirmLabel}
           </button>
-          <button className="btn btn-secondary" onClick={onCancel}>
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
             {cancelLabel}
           </button>
         </div>

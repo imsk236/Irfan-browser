@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigation, type Screen } from "./components/Navigation";
-import { Header } from "./components/Header";
+import { DashboardScreen } from "./screens/dashboard/DashboardScreen";
 import { VolumesScreen } from "./screens/volumes/VolumesScreen";
 import { PersonsScreen } from "./screens/persons/PersonsScreen";
 import { TraceScreen } from "./screens/trace/TraceScreen";
@@ -18,7 +18,7 @@ declare global {
 }
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>("volumes");
+  const [screen, setScreen] = useState<Screen>("dashboard");
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -40,34 +40,37 @@ export function App() {
         justifyContent: "center",
         height: "100vh",
         direction: "rtl",
-        background: "var(--color-page)",
+        background: "var(--color-nav-bg)",
       }}>
-        <p style={{ color: "var(--color-text-muted)" }}>جارٍ التحميل…</p>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ color: "var(--color-nav-brand-ar)", fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+            أرشيف عرفان
+          </div>
+          <div style={{ color: "var(--color-nav-text)", fontSize: 13 }}>جارٍ التحميل…</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", direction: "rtl" }}>
-      <Header />
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <Navigation active={screen} onNavigate={setScreen} />
-        <main
-          style={{
-            flex: 1,
-            overflow: "hidden",
-            display: "flex",
-            flexDirection: "column",
-            background: "var(--color-page)",
-          }}
-          role="main"
-        >
-          {screen === "volumes"  && <VolumesScreen />}
-          {screen === "persons"  && <PersonsScreen />}
-          {screen === "trace"    && <TraceScreen />}
-          {screen === "settings" && <SettingsScreen />}
-        </main>
-      </div>
+    <div style={{ display: "flex", height: "100vh", direction: "rtl", overflow: "hidden" }}>
+      <Navigation active={screen} onNavigate={setScreen} />
+      <main
+        style={{
+          flex: 1,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          background: "var(--color-page)",
+        }}
+        role="main"
+      >
+        {screen === "dashboard" && <DashboardScreen onNavigate={setScreen} />}
+        {screen === "volumes"   && <VolumesScreen />}
+        {screen === "persons"   && <PersonsScreen />}
+        {screen === "trace"     && <TraceScreen />}
+        {screen === "settings"  && <SettingsScreen />}
+      </main>
     </div>
   );
 }

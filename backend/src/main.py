@@ -7,6 +7,7 @@ import asyncio
 import os
 import socket
 import sys
+import uuid
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -16,7 +17,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
 from .db.engine import init_db
-from .api import volumes, works, annotations, persons, relationships, trace, export, vocab
+from .api import volumes, works, annotations, persons, relationships, trace, export, vocab, dashboard
+from .services.activity import set_commit_id
 
 
 def find_free_port() -> int:
@@ -60,6 +62,20 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.middleware("http")
+    async def commit_id_middleware(request: Request, call_next):
+        """Assign a UUID commit_id to every mutating request.
+
+        The ContextVar is copied into the worker thread when FastAPI runs sync
+        route handlers via run_in_executor, so service functions see the same
+        value without extra plumbing.
+        """
+        if request.method in ("POST", "PATCH", "PUT", "DELETE"):
+            set_commit_id(str(uuid.uuid4()))
+        else:
+            set_commit_id(None)
+        return await call_next(request)
+
     app.include_router(volumes.router)
     app.include_router(works.router)
     app.include_router(annotations.router)
@@ -68,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(trace.router)
     app.include_router(export.router)
     app.include_router(vocab.router)
+    app.include_router(dashboard.router)
 
     @app.exception_handler(IntegrityError)
     async def integrity_error_handler(_request: Request, exc: IntegrityError) -> JSONResponse:

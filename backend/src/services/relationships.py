@@ -3,6 +3,7 @@ from sqlalchemy import select
 from ..db.models import PersonRelationship, Annotation, Work
 from .errors import ResourceNotFoundError
 from .vocab import validate_value
+from .activity import log_activity
 
 _AUTHOR_ROLE = "مؤلف"
 
@@ -36,14 +37,11 @@ def link_person_to_work(
     person_id: int,
     work_id: int,
     role: str,
-    confidence: str,
     evidence_source: str | None = None,
     evidence_annotation_id: int | None = None,
     notes: str | None = None,
 ) -> PersonRelationship:
     validate_value(session, "role", role)
-    validate_value(session, "confidence", confidence)
-    validate_value(session, "knowledge_source", evidence_source)
     _validate_evidence_annotation(session, evidence_annotation_id, None, work_id)
 
     if role == _AUTHOR_ROLE:
@@ -64,12 +62,13 @@ def link_person_to_work(
         work_id=work_id,
         volume_id=None,
         role=role,
-        confidence=confidence,
         evidence_source=evidence_source,
         evidence_annotation_id=evidence_annotation_id,
         notes=notes,
     )
     session.add(rel)
+    session.flush()
+    log_activity(session, "person_relationships", rel.id, "create", role)
     session.commit()
     session.refresh(rel)
     return rel
@@ -80,14 +79,11 @@ def link_person_to_volume(
     person_id: int,
     volume_id: int,
     role: str,
-    confidence: str,
     evidence_source: str | None = None,
     evidence_annotation_id: int | None = None,
     notes: str | None = None,
 ) -> PersonRelationship:
     validate_value(session, "role", role)
-    validate_value(session, "confidence", confidence)
-    validate_value(session, "knowledge_source", evidence_source)
     _validate_evidence_annotation(session, evidence_annotation_id, volume_id, None)
 
     rel = PersonRelationship(
@@ -96,12 +92,13 @@ def link_person_to_volume(
         volume_id=volume_id,
         work_id=None,
         role=role,
-        confidence=confidence,
         evidence_source=evidence_source,
         evidence_annotation_id=evidence_annotation_id,
         notes=notes,
     )
     session.add(rel)
+    session.flush()
+    log_activity(session, "person_relationships", rel.id, "create", role)
     session.commit()
     session.refresh(rel)
     return rel
@@ -111,5 +108,7 @@ def delete_relationship(session: Session, relationship_id: int) -> None:
     rel = session.get(PersonRelationship, relationship_id)
     if not rel:
         raise ResourceNotFoundError("الربط غير موجود")
+    label = rel.role
     session.delete(rel)
+    log_activity(session, "person_relationships", relationship_id, "delete", label)
     session.commit()

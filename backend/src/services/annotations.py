@@ -3,6 +3,7 @@ from sqlalchemy import select, func
 from ..db.models import Annotation, PersonRelationship, PersonNameVariant
 from .errors import ResourceNotFoundError
 from .vocab import validate_value
+from .activity import log_activity
 
 
 def create_annotation(
@@ -25,6 +26,8 @@ def create_annotation(
         notes=notes,
     )
     session.add(annotation)
+    session.flush()
+    log_activity(session, "annotations", annotation.id, "create", annotation_type)
     session.commit()
     session.refresh(annotation)
     return annotation
@@ -41,6 +44,7 @@ def update_annotation(session: Session, annotation_id: int, **kwargs) -> Annotat
     for key, value in kwargs.items():
         setattr(annotation, key, value)
 
+    log_activity(session, "annotations", annotation_id, "update", annotation.annotation_type)
     session.commit()
     session.refresh(annotation)
     return annotation
@@ -83,5 +87,7 @@ def delete_annotation(session: Session, annotation_id: int) -> None:
             f"لا يمكن حذف هذا القيد لأنه مصدر لـ {variant_count} تهجئة لاسم شخص. أزل التهجئات أولاً."
         )
 
+    label = annotation.annotation_type
     session.delete(annotation)
+    log_activity(session, "annotations", annotation_id, "delete", label)
     session.commit()

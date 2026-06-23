@@ -38,7 +38,7 @@ def test_inactive_annotation_type_rejected(session):
         ann_svc.create_annotation(session, vol.id, "إهداء")
 
 
-# ── Relationship role and confidence ─────────────────────────────────────────
+# ── Relationship role ─────────────────────────────────────────────────────────
 
 def _make_person(session, name="شخص"):
     return person_svc.create_person(session, name)
@@ -48,37 +48,30 @@ def test_invalid_role_rejected(session):
     vol = _make_volume(session)
     person = _make_person(session)
     with pytest.raises(ValueError, match="غير مقبولة"):
-        rel_svc.link_person_to_volume(session, person.id, vol.id, "دور-مخترع", "مؤكد")
+        rel_svc.link_person_to_volume(session, person.id, vol.id, "دور-مخترع")
 
 
-def test_invalid_confidence_rejected(session):
+def test_valid_role_accepted(session):
     vol = _make_volume(session)
     person = _make_person(session)
-    with pytest.raises(ValueError, match="غير مقبولة"):
-        rel_svc.link_person_to_volume(session, person.id, vol.id, "مالك", "يقين-مخترع")
-
-
-def test_valid_role_and_confidence_accepted(session):
-    vol = _make_volume(session)
-    person = _make_person(session)
-    rel = rel_svc.link_person_to_volume(session, person.id, vol.id, "مالك", "مؤكد")
+    rel = rel_svc.link_person_to_volume(session, person.id, vol.id, "مالك")
     assert rel.id is not None
 
 
-def test_invalid_knowledge_source_rejected(session):
-    vol = _make_volume(session)
-    person = _make_person(session)
-    with pytest.raises(ValueError, match="غير مقبولة"):
-        rel_svc.link_person_to_volume(
-            session, person.id, vol.id, "مالك", "مؤكد", evidence_source="مصدر-مخترع"
-        )
-
-
-def test_none_knowledge_source_accepted(session):
+def test_evidence_source_free_text_accepted(session):
     vol = _make_volume(session)
     person = _make_person(session)
     rel = rel_svc.link_person_to_volume(
-        session, person.id, vol.id, "مالك", "مؤكد", evidence_source=None
+        session, person.id, vol.id, "مالك", evidence_source="ابن بطوطة"
+    )
+    assert rel.evidence_source == "ابن بطوطة"
+
+
+def test_none_evidence_source_accepted(session):
+    vol = _make_volume(session)
+    person = _make_person(session)
+    rel = rel_svc.link_person_to_volume(
+        session, person.id, vol.id, "مالك", evidence_source=None
     )
     assert rel.evidence_source is None
 
@@ -88,5 +81,5 @@ def test_inactive_role_rejected(session):
     vol = _make_volume(session)
     person = _make_person(session)
     with pytest.raises(ValueError, match="غير مقبولة"):
-        rel_svc.link_person_to_volume(session, person.id, vol.id, "مستعير", "مؤكد")
+        rel_svc.link_person_to_volume(session, person.id, vol.id, "مستعير")
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { personsApi } from "../../api";
 import type { Appearance, Person } from "../../api/types";
-import { ConfidenceTag } from "../../components/ConfidenceTag";
+import { normalizeArabic } from "../../utils/arabic";
 import { PersonFormModal } from "../../components/PersonFormModal";
 
 function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
@@ -49,13 +49,12 @@ export function PersonsScreen() {
     }
   }
 
-  const filtered = persons.filter(
-    (p) =>
-      p.preferred_name.includes(search) ||
-      (p.ism ?? "").includes(search) ||
-      (p.laqab ?? "").includes(search) ||
-      (p.known_as ?? "").includes(search)
-  );
+  const q = normalizeArabic(search.trim());
+  const filtered = persons.filter((p) => {
+    if (!q) return true;
+    return [p.preferred_name, p.ism, p.laqab, p.known_as, p.nisba_1, p.nisba_2, p.kunya, p.nasab]
+      .some((f) => f && normalizeArabic(f).includes(q));
+  });
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
@@ -235,16 +234,21 @@ export function PersonsScreen() {
                 </p>
               )}
               {!appearancesLoading && appearances && appearances.length > 0 && (
-                <table className="data-table" style={{ marginTop: "var(--space-3)" }}>
+                <table className="data-table" style={{ marginTop: "var(--space-3)", tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: "15%" }} />
+                    <col style={{ width: "13%" }} />
+                    <col style={{ width: "20%" }} />
+                    <col style={{ width: "37%" }} />
+                    <col style={{ width: "15%" }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th>الرمز</th>
                       <th>الدور</th>
-                      <th>الأثر</th>
-                      <th>الثقة</th>
-                      <th>نوع الدليل</th>
+                      <th>العنوان</th>
                       <th>النص</th>
-                      <th>اللوحة</th>
+                      <th>مصدر الصلة</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -258,27 +262,17 @@ export function PersonsScreen() {
                             </span>
                           )}
                         </td>
-                        <td style={{ fontSize: 13 }}>{a.role}</td>
-                        <td style={{ fontSize: 13 }}>{a.work_title ?? "—"}</td>
-                        <td>
-                          <ConfidenceTag value={a.confidence} />
-                        </td>
-                        <td style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                          {a.evidence_annotation_type ?? "—"}
+                        <td>{a.role}</td>
+                        <td style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {a.work_title ?? "—"}
                         </td>
                         <td
-                          style={{
-                            fontSize: 12,
-                            maxWidth: 200,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
+                          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                           title={a.evidence_text ?? ""}
                         >
-                          {a.evidence_text ? `«${a.evidence_text.slice(0, 60)}${a.evidence_text.length > 60 ? "…" : ""}»` : "—"}
+                          {a.evidence_text ? `«${a.evidence_text}»` : "—"}
                         </td>
-                        <td style={{ fontSize: 12 }}>{a.evidence_image_location ?? "—"}</td>
+                        <td style={{ color: "var(--color-text-muted)" }}>{a.evidence_source ?? "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -298,6 +292,12 @@ export function PersonsScreen() {
         <PersonFormModal
           person={selected}
           onSaved={handleSaved}
+          onDeleted={() => {
+            setPersons((prev) => prev.filter((p) => p.id !== selected?.id));
+            setSelected(null);
+            setAppearances(null);
+            setShowForm(false);
+          }}
           onCancel={() => setShowForm(false)}
         />
       )}

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { traceApi, volumesApi } from "../../api";
 import type { Repository, TraceResult } from "../../api/types";
 import { PersonField } from "../../components/PersonField";
-import { ConfidenceTag } from "../../components/ConfidenceTag";
 import { ConfirmModal } from "../../components/ConfirmModal";
 
 interface SelectedPerson {
@@ -335,17 +334,21 @@ export function TraceScreen() {
                 لا توجد نتائج لهذا الفلتر.
               </p>
             ) : (
-              <table className="data-table">
+              <table className="data-table" style={{ tableLayout: "fixed" }}>
+                <colgroup>
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "20%" }} />
+                  <col style={{ width: "37%" }} />
+                  <col style={{ width: "15%" }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>الرمز</th>
                     <th>الدور</th>
                     <th>العنوان</th>
-                    <th>الثقة</th>
-                    <th>نوع الدليل</th>
                     <th>نص الدليل</th>
-                    <th>اللوحة</th>
-                    <th>المصدر</th>
+                    <th>مصدر الصلة</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -359,30 +362,17 @@ export function TraceScreen() {
                           </span>
                         )}
                       </td>
-                      <td style={{ fontSize: 13 }}>{r.role}</td>
-                      <td style={{ fontSize: 13 }}>{r.work_title ?? "—"}</td>
-                      <td>
-                        <ConfidenceTag value={r.confidence} />
-                      </td>
-                      <td style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-                        {r.evidence_annotation_type ?? "—"}
+                      <td>{r.role}</td>
+                      <td style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.work_title ?? "—"}
                       </td>
                       <td
-                        style={{
-                          fontSize: 12,
-                          maxWidth: 200,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
+                        style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                         title={r.evidence_text ?? ""}
                       >
-                        {r.evidence_text
-                          ? `«${r.evidence_text.slice(0, 50)}${r.evidence_text.length > 50 ? "…" : ""}»`
-                          : "—"}
+                        {r.evidence_text ? `«${r.evidence_text}»` : "—"}
                       </td>
-                      <td style={{ fontSize: 12 }}>{r.evidence_image_location ?? "—"}</td>
-                      <td style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                      <td style={{ color: "var(--color-text-muted)" }}>
                         {r.evidence_source ?? "—"}
                       </td>
                     </tr>

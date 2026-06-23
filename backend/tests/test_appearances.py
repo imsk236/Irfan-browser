@@ -25,12 +25,12 @@ def archive_scene(session):
 
     # Work-level relationship with evidence annotation
     work_rel = rel_svc.link_person_to_work(
-        session, person.id, work.id, role="مؤلف", confidence="مؤكد",
+        session, person.id, work.id, role="مؤلف",
         evidence_annotation_id=annotation.id,
     )
     # Volume-level relationship without evidence
     vol_rel = rel_svc.link_person_to_volume(
-        session, person.id, volume.id, role="مالك", confidence="مرجح",
+        session, person.id, volume.id, role="مالك",
     )
 
     return {
@@ -74,13 +74,6 @@ def test_appearances_include_work_title(session, archive_scene):
     assert len(work_rel_results) == 1
     assert work_rel_results[0].work_title == work.title
 
-
-def test_appearances_include_confidence(session, archive_scene):
-    person = archive_scene["person"]
-    results = trace_scholar(session, person.id)
-    confidences = {r.confidence for r in results}
-    assert "مؤكد" in confidences
-    assert "مرجح" in confidences
 
 
 def test_appearances_include_evidence_annotation_type(session, archive_scene):
@@ -127,7 +120,6 @@ def test_appearances_via_http(client):
         "level": "volume",
         "volume_id": vol_r.json()["id"],
         "role": "مالك",
-        "confidence": "مؤكد",
     })
 
     person_id = person_r.json()["id"]
@@ -139,4 +131,4 @@ def test_appearances_via_http(client):
     assert item["role"] == "مالك"
     assert item["serial"] == vol_r.json()["serial"]
     assert "evidence_annotation_type" in item
-    assert "confidence" in item
+    assert "evidence_source" in item

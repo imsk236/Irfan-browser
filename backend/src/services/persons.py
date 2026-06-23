@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, text
 from rapidfuzz import process as rf_process, fuzz
-from ..db.models import Person, PersonNameVariant, PersonWilaya
+from ..db.models import Person, PersonNameVariant, PersonRelationship, PersonWilaya
 from ..utils.arabic import normalize_arabic
 from .errors import ResourceNotFoundError
+from .activity import log_activity
 
 _FUZZY_SCORE_THRESHOLD = 75
 
@@ -128,6 +129,7 @@ def create_person(
         normalized_form=normalize_arabic(preferred_name),
     )
     session.add(variant)
+    log_activity(session, "persons", person.id, "create", preferred_name)
     session.commit()
     session.refresh(person)
     return person
@@ -159,9 +161,43 @@ def update_person(session: Session, person_id: int, **kwargs) -> Person:
         raise ResourceNotFoundError("الشخص غير موجود")
     for key, value in kwargs.items():
         setattr(person, key, value)
+    if "preferred_name" in kwargs:
+        session.execute(
+            text(
+                "INSERT OR IGNORE INTO person_name_variants"
+                " (person_id, written_form, normalized_form)"
+                " VALUES (:pid, :wf, :nf)"
+            ),
+            {"pid": person_id, "wf": kwargs["preferred_name"],
+             "nf": normalize_arabic(kwargs["preferred_name"])},
+        )
+    log_activity(session, "persons", person_id, "update", person.preferred_name)
     session.commit()
     session.refresh(person)
     return person
+
+
+def delete_person(session: Session, person_id: int) -> None:
+    person = session.get(Person, person_id)
+    if not person:
+        raise ResourceNotFoundError("الشخص غير موجود")
+
+    rels = session.execute(
+        select(PersonRelationship).where(PersonRelationship.person_id == person_id)
+    ).scalars().all()
+
+    if rels:
+        raise ValueError(
+            f"لا يمكن حذف هذا الشخص لوجود {len(rels)} صلة مرتبطة به في الأرشيف. "
+            "احذف الصلات أولاً ثم أعد المحاولة."
+        )
+
+    preferred_name = person.preferred_name
+    session.execute(text("DELETE FROM person_name_variants WHERE person_id = :pid"), {"pid": person_id})
+    session.execute(text("DELETE FROM person_wilayas WHERE person_id = :pid"), {"pid": person_id})
+    session.execute(text("DELETE FROM persons WHERE id = :pid"), {"pid": person_id})
+    log_activity(session, "persons", person_id, "delete", preferred_name)
+    session.commit()
 
 
 def get_person(session: Session, person_id: int) -> Person | None:

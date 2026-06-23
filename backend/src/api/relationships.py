@@ -13,7 +13,6 @@ class RelationshipCreate(BaseModel):
     work_id: int | None = None
     volume_id: int | None = None
     role: str
-    confidence: str
     evidence_source: str | None = None
     evidence_annotation_id: int | None = None
     notes: str | None = None
@@ -26,7 +25,6 @@ class RelationshipOut(BaseModel):
     work_id: int | None
     volume_id: int | None
     role: str
-    confidence: str
     evidence_source: str | None
     evidence_annotation_id: int | None
     notes: str | None
@@ -46,7 +44,6 @@ def create_relationship(body: RelationshipCreate):
                     person_id=body.person_id,
                     work_id=body.work_id,
                     role=body.role,
-                    confidence=body.confidence,
                     evidence_source=body.evidence_source,
                     evidence_annotation_id=body.evidence_annotation_id,
                     notes=body.notes,
@@ -59,7 +56,6 @@ def create_relationship(body: RelationshipCreate):
                     person_id=body.person_id,
                     volume_id=body.volume_id,
                     role=body.role,
-                    confidence=body.confidence,
                     evidence_source=body.evidence_source,
                     evidence_annotation_id=body.evidence_annotation_id,
                     notes=body.notes,

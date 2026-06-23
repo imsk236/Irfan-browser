@@ -2,8 +2,11 @@ import { useState } from "react";
 import { worksApi, relationshipsApi } from "../../api";
 import { VocabSelect } from "../../components/VocabSelect";
 import { PersonField } from "../../components/PersonField";
+import { PersonFormModal } from "../../components/PersonFormModal";
 import { FolioInput } from "../../components/FolioInput";
-import type { Relationship, Work } from "../../api/types";
+import type { Person, Relationship, Work } from "../../api/types";
+
+const SOURCE_SENTINELS = ["المخطوط", "المفهرس"] as const;
 
 function folioToInt(encoded: string): number | null {
   const m = encoded.match(/^(\d+)([يس])$/);
@@ -48,6 +51,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
   const [author, setAuthor] = useState<SelectedPerson | null>(null);
   const [authorUnknown, setAuthorUnknown] = useState(false);
   const [authorSource, setAuthorSource] = useState("");
+  const [authorCustom, setAuthorCustom] = useState(false);
 
   // Scribe (ناسخ)
   const existingScribeRel = work && relationships
@@ -57,6 +61,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
   const [scribe, setScribe] = useState<SelectedPerson | null>(null);
   const [scribeUnknown, setScribeUnknown] = useState(false);
   const [scribeSource, setScribeSource] = useState("");
+  const [scribeCustom, setScribeCustom] = useState(false);
 
   // Copied for (منسوخ له — optional)
   const existingCopiedForRel = work && relationships
@@ -65,9 +70,13 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
   const [replaceCopiedFor, setReplaceCopiedFor] = useState(false);
   const [copiedFor, setCopiedFor] = useState<SelectedPerson | null>(null);
   const [copiedForSource, setCopiedForSource] = useState("");
+  const [copiedForCustom, setCopiedForCustom] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const [personModalSlot, setPersonModalSlot] = useState<"author" | "scribe" | "copiedFor" | null>(null);
+  const [personModalName, setPersonModalName] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -149,7 +158,6 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
             work_id: savedWork.id,
             volume_id: null,
             role: "مؤلف",
-            confidence: "مؤكد",
             evidence_source: authorSource || null,
             evidence_annotation_id: null,
             notes: null,
@@ -170,7 +178,6 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
             work_id: savedWork.id,
             volume_id: null,
             role: "ناسخ",
-            confidence: "مؤكد",
             evidence_source: scribeSource || null,
             evidence_annotation_id: null,
             notes: null,
@@ -191,7 +198,6 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
             work_id: savedWork.id,
             volume_id: null,
             role: "منسوخ له",
-            confidence: "مؤكد",
             evidence_source: copiedForSource || null,
             evidence_annotation_id: null,
             notes: null,
@@ -230,8 +236,9 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
     onUnknownChange,
     source,
     onSourceChange,
-    confidence,
-    onConfidenceChange,
+    showCustom,
+    onShowCustomChange,
+    onRequestCreate,
   }: {
     roleLabel: string;
     required: boolean;
@@ -245,7 +252,14 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
     onUnknownChange: (v: boolean) => void;
     source: string;
     onSourceChange: (v: string) => void;
+    showCustom: boolean;
+    onShowCustomChange: (v: boolean) => void;
+    onRequestCreate: (name: string) => void;
   }) {
+    const selectedOption = SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number])
+      ? source
+      : showCustom ? "مرجع آخر" : null;
+
     return (
       <div
         style={{
@@ -287,18 +301,47 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
                 value={person}
                 onChange={onPersonChange}
                 saveVariant
+                onRequestCreate={onRequestCreate}
               />
             )}
 
             {!unknown && person && (
               <div className="field" style={{ marginTop: "var(--space-3)" }}>
-                <label>مصدر المعرفة</label>
-                <VocabSelect
-                  category="knowledge_source"
-                  value={source}
-                  onChange={onSourceChange}
-                  placeholder="كيف عرفنا؟"
-                />
+                <label style={{ fontSize: 12, color: "var(--color-text-muted)" }}>مصدر الصلة</label>
+                <div style={{ display: "flex", gap: "var(--space-5)", marginTop: "var(--space-1)" }}>
+                  {(["المخطوط", "المفهرس", "مرجع آخر"] as const).map((opt) => (
+                    <label key={opt} style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", fontSize: 13, cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name={`source-${roleLabel}`}
+                        checked={selectedOption === opt}
+                        onChange={() => {
+                          if (opt === "مرجع آخر") {
+                            onShowCustomChange(true);
+                            if (SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number])) {
+                              onSourceChange("");
+                            }
+                          } else {
+                            onShowCustomChange(false);
+                            onSourceChange(opt);
+                          }
+                        }}
+                      />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+                {showCustom && (
+                  <input
+                    className="input"
+                    type="text"
+                    placeholder="اذكر المرجع…"
+                    value={SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number]) ? "" : source}
+                    onChange={(e) => onSourceChange(e.target.value)}
+                    style={{ marginTop: "var(--space-2)" }}
+                    autoFocus
+                  />
+                )}
               </div>
             )}
 
@@ -370,6 +413,9 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         onUnknownChange={setAuthorUnknown}
         source={authorSource}
         onSourceChange={setAuthorSource}
+        showCustom={authorCustom}
+        onShowCustomChange={setAuthorCustom}
+        onRequestCreate={(name) => { setPersonModalSlot("author"); setPersonModalName(name); }}
       />
 
       {/* الناسخ */}
@@ -386,6 +432,9 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         onUnknownChange={setScribeUnknown}
         source={scribeSource}
         onSourceChange={setScribeSource}
+        showCustom={scribeCustom}
+        onShowCustomChange={setScribeCustom}
+        onRequestCreate={(name) => { setPersonModalSlot("scribe"); setPersonModalName(name); }}
       />
 
       {/* منسوخ له (اختياري) */}
@@ -415,16 +464,48 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
               value={copiedFor}
               onChange={setCopiedFor}
               saveVariant
+              onRequestCreate={(name) => { setPersonModalSlot("copiedFor"); setPersonModalName(name); }}
             />
             {copiedFor && (
               <div className="field" style={{ marginTop: "var(--space-3)" }}>
-                <label>مصدر المعرفة</label>
-                <VocabSelect
-                  category="knowledge_source"
-                  value={copiedForSource}
-                  onChange={setCopiedForSource}
-                  placeholder="كيف عرفنا؟"
-                />
+                <label style={{ fontSize: 12, color: "var(--color-text-muted)" }}>مصدر الصلة</label>
+                <div style={{ display: "flex", gap: "var(--space-5)", marginTop: "var(--space-1)" }}>
+                  {(["المخطوط", "المفهرس", "مرجع آخر"] as const).map((opt) => {
+                    const selected = SOURCE_SENTINELS.includes(copiedForSource as typeof SOURCE_SENTINELS[number])
+                      ? copiedForSource
+                      : copiedForCustom ? "مرجع آخر" : null;
+                    return (
+                      <label key={opt} style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", fontSize: 13, cursor: "pointer" }}>
+                        <input
+                          type="radio"
+                          name="source-copiedFor"
+                          checked={selected === opt}
+                          onChange={() => {
+                            if (opt === "مرجع آخر") {
+                              setCopiedForCustom(true);
+                              if (SOURCE_SENTINELS.includes(copiedForSource as typeof SOURCE_SENTINELS[number])) setCopiedForSource("");
+                            } else {
+                              setCopiedForCustom(false);
+                              setCopiedForSource(opt);
+                            }
+                          }}
+                        />
+                        {opt}
+                      </label>
+                    );
+                  })}
+                </div>
+                {copiedForCustom && (
+                  <input
+                    className="input"
+                    type="text"
+                    placeholder="اذكر المرجع…"
+                    value={SOURCE_SENTINELS.includes(copiedForSource as typeof SOURCE_SENTINELS[number]) ? "" : copiedForSource}
+                    onChange={(e) => setCopiedForSource(e.target.value)}
+                    style={{ marginTop: "var(--space-2)" }}
+                    autoFocus
+                  />
+                )}
               </div>
             )}
             {work && replaceCopiedFor && (
@@ -522,6 +603,21 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
           إلغاء
         </button>
       </div>
+
+      {personModalSlot !== null && (
+        <PersonFormModal
+          person={null}
+          initialName={personModalName}
+          onSaved={(person: Person) => {
+            const selected = { person_id: person.id, preferred_name: person.preferred_name, written_form: person.preferred_name };
+            if (personModalSlot === "author") setAuthor(selected);
+            else if (personModalSlot === "scribe") setScribe(selected);
+            else setCopiedFor(selected);
+            setPersonModalSlot(null);
+          }}
+          onCancel={() => setPersonModalSlot(null)}
+        />
+      )}
     </form>
   );
 }

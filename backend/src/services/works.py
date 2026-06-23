@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from ..db.models import Work, Annotation, PersonRelationship
 from .errors import ResourceNotFoundError
+from .activity import log_activity
 
 
 def create_work(
@@ -32,6 +33,8 @@ def create_work(
         copy_time=copy_time,
     )
     session.add(work)
+    session.flush()
+    log_activity(session, "works", work.id, "create", title)
     session.commit()
     session.refresh(work)
     return work
@@ -43,6 +46,7 @@ def update_work(session: Session, work_id: int, **kwargs) -> Work:
         raise ResourceNotFoundError("العنوان غير موجود")
     for key, value in kwargs.items():
         setattr(work, key, value)
+    log_activity(session, "works", work_id, "update", work.title)
     session.commit()
     session.refresh(work)
     return work
@@ -81,5 +85,7 @@ def delete_work(session: Session, work_id: int) -> None:
             f"لا يمكن حذف هذا العنوان لأنه مرتبط بـ {rel_count} شخص. أزل الروابط أولاً."
         )
 
+    label = work.title
     session.delete(work)
+    log_activity(session, "works", work_id, "delete", label)
     session.commit()

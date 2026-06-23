@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { annotationsApi, relationshipsApi } from "../api";
-import type { Annotation, Work } from "../api/types";
+import type { Annotation, Person, Work } from "../api/types";
 import { VocabSelect } from "./VocabSelect";
 import { PersonField } from "./PersonField";
+import { PersonFormModal } from "./PersonFormModal";
 import { FolioInput } from "./FolioInput";
 
 interface SelectedPerson {
@@ -58,6 +59,8 @@ export function AnnotationFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const [personModalName, setPersonModalName] = useState<string | null>(null);
+
   useEffect(() => {
     if (!annotation) return;
     relationshipsApi.listForVolume(volumeId).then((rels) => {
@@ -98,6 +101,15 @@ export function AnnotationFormModal({
         return;
       }
     }
+    // Include any person staged in the input but not yet added via the إضافة button
+    const effectivePending = (() => {
+      if (!stagePerson) return pendingPersons;
+      const alreadyIn =
+        pendingPersons.some((p) => p.person.person_id === stagePerson.person_id) ||
+        existingPersons.some((p) => p.personId === stagePerson.person_id);
+      return alreadyIn ? pendingPersons : [...pendingPersons, { person: stagePerson, role: stageRole }];
+    })();
+
     setSaving(true);
     try {
       let saved: Annotation;
@@ -119,14 +131,13 @@ export function AnnotationFormModal({
         saved = await annotationsApi.create(body);
       }
 
-      for (const p of pendingPersons) {
+      for (const p of effectivePending) {
         await relationshipsApi.create({
           person_id: p.person.person_id,
           level: "volume",
           volume_id: volumeId,
           work_id: null,
           role: p.role,
-          confidence: "مؤكد",
           evidence_source: null,
           evidence_annotation_id: saved.id,
           notes: null,
@@ -139,6 +150,11 @@ export function AnnotationFormModal({
     } finally {
       setSaving(false);
     }
+  }
+
+  function handlePersonCreated(person: Person) {
+    setStagePerson({ person_id: person.id, preferred_name: person.preferred_name, written_form: person.preferred_name });
+    setPersonModalName(null);
   }
 
   return (
@@ -231,7 +247,13 @@ export function AnnotationFormModal({
 
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: "var(--space-2)", alignItems: "end" }}>
               <div className="field" style={{ marginBottom: 0 }}>
-                <PersonField label="الشخص" value={stagePerson} onChange={setStagePerson} saveVariant />
+                <PersonField
+                  label="الشخص"
+                  value={stagePerson}
+                  onChange={setStagePerson}
+                  saveVariant
+                  onRequestCreate={setPersonModalName}
+                />
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>الدور</label>
@@ -264,6 +286,15 @@ export function AnnotationFormModal({
           </div>
         </form>
       </div>
+
+      {personModalName !== null && (
+        <PersonFormModal
+          person={null}
+          initialName={personModalName}
+          onSaved={handlePersonCreated}
+          onCancel={() => setPersonModalName(null)}
+        />
+      )}
     </div>
   );
 }
