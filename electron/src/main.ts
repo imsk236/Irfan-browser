@@ -1,6 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { spawn, ChildProcess } from "child_process";
 import * as path from "path";
+import * as fs from "fs";
+import { writeFile, copyFile } from "fs/promises";
 
 const isDev = !app.isPackaged;
 let backendProcess: ChildProcess | null = null;
@@ -36,7 +38,11 @@ function startBackend(dbPath: string): Promise<number> {
         env: spawnEnv,
       });
     } else {
-      const backendExe = path.join((process as any).resourcesPath as string, "backend.exe");
+      const backendExe = path.join(
+        (process as any).resourcesPath as string,
+        "backend",
+        "backend.exe"
+      );
       child = spawn(backendExe, args);
     }
 
@@ -82,12 +88,15 @@ function createWindow(port: number) {
     minWidth: 900,
     minHeight: 600,
     backgroundColor: "#F7F5EF",
+    icon: isDev
+      ? path.join(__dirname, "..", "..", "frontend", "public", "irfan_logo.png")
+      : path.join((process as any).resourcesPath as string, "frontend", "dist", "irfan_logo.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
-    title: "أرشيف إرفان للمخطوطات",
+    title: "أرشيف عرفان للمخطوطات",
   });
 
   if (isDev) {
@@ -95,7 +104,12 @@ function createWindow(port: number) {
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(
-      path.join(__dirname, "..", "..", "frontend", "dist", "index.html")
+      path.join(
+        (process as any).resourcesPath as string,
+        "frontend",
+        "dist",
+        "index.html"
+      )
     );
   }
 
@@ -104,8 +118,61 @@ function createWindow(port: number) {
 
 ipcMain.handle("get-backend-port", () => backendPort);
 
+ipcMain.handle("dialog:open-directory", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openDirectory", "createDirectory"],
+    title: "اختر مجلد التصدير",
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle("dialog:save-pdf", async () => {
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const time = `${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}`;
+  const result = await dialog.showSaveDialog({
+    title: "حفظ ملف PDF",
+    defaultPath: `ارشيف_عرفان_${date}_${time}.pdf`,
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+  });
+  return result.canceled ? null : result.filePath;
+});
+
+ipcMain.handle("export:pdf", async (_, { outputPath, researcher }: { outputPath: string; researcher: string }) => {
+  const win = new BrowserWindow({
+    show: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  });
+  try {
+    const url = `http://localhost:${backendPort}/export/pdf-html?researcher=${encodeURIComponent(researcher || "")}`;
+    await win.loadURL(url);
+    // Wait for fonts (Google Fonts) to finish loading
+    await win.webContents.executeJavaScript("document.fonts.ready");
+    const pdfData = await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: "A4",
+      landscape: false,
+    });
+    await writeFile(outputPath, pdfData);
+    return { file: outputPath };
+  } finally {
+    win.close();
+  }
+});
+
 app.whenReady().then(async () => {
   const dbPath = path.join(app.getPath("userData"), "archive.db");
+
+  // On first launch in production, copy the bundled seed database to userData.
+  if (!isDev && !fs.existsSync(dbPath)) {
+    const bundledDb = path.join(
+      (process as any).resourcesPath as string,
+      "archive.db"
+    );
+    if (fs.existsSync(bundledDb)) {
+      await copyFile(bundledDb, dbPath);
+    }
+  }
 
   try {
     backendPort = await startBackend(dbPath);

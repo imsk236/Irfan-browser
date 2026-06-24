@@ -13,6 +13,9 @@ declare global {
   interface Window {
     archive?: {
       getBackendPort: () => Promise<number>;
+      openDirectory: () => Promise<string | null>;
+      savePdf: () => Promise<string | null>;
+      exportPdf: (outputPath: string, researcher: string) => Promise<{ file: string }>;
     };
   }
 }
@@ -43,6 +46,11 @@ export function App() {
         background: "var(--color-nav-bg)",
       }}>
         <div style={{ textAlign: "center" }}>
+          <img
+            src="/irfan_logo.png"
+            alt="عرفان"
+            style={{ width: 72, height: 72, marginBottom: 16, objectFit: "contain" }}
+          />
           <div style={{ color: "var(--color-nav-brand-ar)", fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
             أرشيف عرفان
           </div>

@@ -1,6 +1,7 @@
 {
   "appId": "com.irfan.manuscript-archive",
-  "productName": "أرشيف إرفان للمخطوطات",
+  "productName": "أرشيف عرفان للمخطوطات",
+  "electronVersion": "34.5.8",
   "directories": {
     "buildResources": "resources",
     "output": "out"
@@ -12,8 +13,16 @@
   ],
   "extraResources": [
     {
-      "from": "resources/backend.exe",
-      "to": "backend.exe"
+      "from": "resources/backend",
+      "to": "backend"
+    },
+    {
+      "from": "resources/archive.db",
+      "to": "archive.db"
+    },
+    {
+      "from": "../frontend/dist",
+      "to": "frontend/dist"
     }
   ],
   "win": {
