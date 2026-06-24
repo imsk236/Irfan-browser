@@ -163,6 +163,24 @@ export function VolumesScreen() {
     );
   }
 
+  async function deleteVolume() {
+    if (!selected) return;
+    askConfirm(
+      "حذف المجلد",
+      `هل تريد حذف المجلد «${selected.serial}»؟`,
+      async () => {
+        dismissConfirm();
+        await volumesApi.delete(selected.id);
+        setSelected(null);
+        setWorks([]);
+        setAnnotations([]);
+        setRelationships([]);
+        setVolumes(await volumesApi.list());
+      },
+      true
+    );
+  }
+
   async function deleteRelationship(r: Relationship) {
     askConfirm(
       "إزالة الشخص",
@@ -334,12 +352,20 @@ export function VolumesScreen() {
                     {selected.serial}
                   </span>
                 </div>
-                <button
-                  className="btn btn-secondary btn-compact"
-                  onClick={() => setVolumeFormMode("edit")}
-                >
-                  تعديل
-                </button>
+                <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                  <button
+                    className="btn btn-secondary btn-compact"
+                    onClick={() => setVolumeFormMode("edit")}
+                  >
+                    تعديل
+                  </button>
+                  <button
+                    className="btn btn-danger btn-compact"
+                    onClick={() => deleteVolume()}
+                  >
+                    حذف
+                  </button>
+                </div>
               </div>
               <div style={{ fontSize: 14, color: "var(--color-text-muted)", marginBottom: "var(--space-2)" }}>
                 الخزانة: {repoName(selected.repository_id)}
