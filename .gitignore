@@ -15,7 +15,15 @@ dist-python/
 # Build artifacts
 electron/out/
 electron/dist/
+electron/resources/backend/
 frontend/dist/
+build/
+
+# Dev/debug artifacts (never commit)
+Tempshots/
+backend/db_backups/
+seed_log.txt
+.impeccable/
 
 # Database (user data — never commit)
 *.db

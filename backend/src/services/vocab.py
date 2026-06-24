@@ -54,6 +54,7 @@ def add_value(session: Session, category: str, value: str) -> Vocab:
         select(Vocab.sort_order)
         .where(Vocab.category == category)
         .order_by(Vocab.sort_order.desc())
+        .limit(1)
     ).scalar_one_or_none() or 0
 
     row = Vocab(category=category, value=value, sort_order=max_order + 1, is_active=True)

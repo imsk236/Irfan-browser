@@ -12,12 +12,6 @@ import type { Screen } from "../../components/Navigation";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function todayMuscat(): string {
-  return new Date(Date.now() + 4 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
-}
-
 function buildCalendarGrid(activityDays: ActivityDay[]) {
   const activityMap = new Map(activityDays.map((d) => [d.date, d.count]));
 

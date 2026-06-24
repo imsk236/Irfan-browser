@@ -33,14 +33,22 @@ def get_engine():
 def init_db():
     """Apply all Alembic migrations, set WAL mode, and run seed data."""
     import os
-    from alembic.config import Config as AlembicConfig
-    from alembic import command as alembic_command
+    import sys
 
-    ini_path = os.path.normpath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "alembic.ini")
-    )
-    alembic_cfg = AlembicConfig(ini_path)
-    alembic_command.upgrade(alembic_cfg, "head")
+    if getattr(sys, "frozen", False):
+        # PyInstaller bundle: Alembic files are not available; use SQLAlchemy
+        # create_all instead (no-op when the pre-seeded DB already has all tables).
+        engine = get_engine()
+        Base.metadata.create_all(engine)
+    else:
+        from alembic.config import Config as AlembicConfig
+        from alembic import command as alembic_command
+
+        ini_path = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "alembic.ini")
+        )
+        alembic_cfg = AlembicConfig(ini_path)
+        alembic_command.upgrade(alembic_cfg, "head")
 
     engine = get_engine()
     with engine.connect() as conn:

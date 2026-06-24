@@ -138,6 +138,11 @@ export const exportApi = {
     api.post<{ files: string[] }>("/export/csv", { output_dir: outputDir }),
   json: (outputDir: string) =>
     api.post<{ file: string }>("/export/json", { output_dir: outputDir }),
+  excel: (outputDir: string, researcherName: string) =>
+    api.post<{ file: string }>("/export/excel", {
+      output_dir: outputDir,
+      researcher_name: researcherName,
+    }),
 };
 
 // Dashboard
