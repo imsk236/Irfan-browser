@@ -29,6 +29,7 @@
       "to": "icon.ico"
     }
   ],
+  "artifactName": "irfan-archive-setup-${version}.${ext}",
   "win": {
     "target": "nsis",
     "icon": "resources/icon.ico"
