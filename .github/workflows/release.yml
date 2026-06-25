@@ -38,6 +38,9 @@ jobs:
       - name: Build frontend
         run: npm run build --workspace=frontend
 
+      - name: Build Electron main process
+        run: npm run build --workspace=electron
+
       - name: Build Electron installer and publish to GitHub Releases
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
