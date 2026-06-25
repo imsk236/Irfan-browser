@@ -43,6 +43,7 @@
   "publish": {
     "provider": "github",
     "owner": "imsk236",
-    "repo": "Irfan-browser"
+    "repo": "Irfan-browser",
+    "releaseType": "release"
   }
 }
