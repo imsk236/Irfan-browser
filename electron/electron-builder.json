@@ -37,8 +37,7 @@
     "oneClick": false,
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
-    "installerLanguages": ["ar"],
-    "defaultInstallationDirectory": "$LOCALAPPDATA\\Programs\\${productName}"
+    "language": "1025"
   },
   "publish": {
     "provider": "github",
