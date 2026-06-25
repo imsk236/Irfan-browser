@@ -122,6 +122,57 @@ def test_something(client, session):
     # session = SQLAlchemy session, rolls back after test
 ```
 
+## Releasing updates to the client
+
+### How updates work
+
+The app uses `electron-updater` pointed at GitHub Releases (`imsk236/Irfan-browser`). On launch (production only), the Electron main process checks for a newer release after a 3-second delay. If one exists, a banner appears in the Arabic UI guiding the user through download and restart. The client's database (`archive.db`) lives in `AppData\Roaming\com.irfan.manuscript-archive\` and is never touched by updates.
+
+### Release pipeline
+
+Pushing a `v*.*.*` git tag triggers `.github/workflows/release.yml` (GitHub Actions, `windows-latest`). The workflow:
+
+1. Builds `backend.exe` via PyInstaller (`backend/backend.spec`)
+2. Builds the frontend via Vite
+3. Packages the Electron NSIS installer via `electron-builder --publish always`
+4. Publishes the installer + `latest.yml` to GitHub Releases
+
+The `GH_TOKEN` secret (repo scope) must exist in the repo's Actions secrets for publishing to work.
+
+### Shipping a new version
+
+```bash
+# 1. Bump the version in electron/package.json (the version electron-builder reads)
+#    Use one of:
+npm version patch --workspace=electron --no-git-tag-version   # 0.2.0 → 0.2.1
+npm version minor --workspace=electron --no-git-tag-version   # 0.2.0 → 0.3.0
+
+# 2. Commit, tag, and push — the tag triggers the build
+git add electron/package.json
+git commit -m "chore: bump version to 0.2.1"
+git tag v0.2.1
+git push && git push --tags
+```
+
+Build takes ~10-15 minutes. Monitor at `github.com/imsk236/Irfan-browser/actions`.
+
+### First delivery is always manual
+
+Any client running a build older than v0.2.0 has no updater code. They must receive the new installer by hand once. After installing v0.2.0+, all future updates are automatic.
+
+### Version numbers
+
+- `electron/package.json` — the authoritative version; must match the git tag (e.g. `0.2.1` ↔ `v0.2.1`)
+- Root `package.json` — npm workspace tooling only; does not affect the built app
+- Never create tags manually; always use `npm version` + `git tag` so they stay in sync
+
+### If the GitHub Actions build fails
+
+Check the Actions log at `github.com/imsk236/Irfan-browser/actions`. Common causes:
+- `GH_TOKEN` secret missing or expired → recreate at GitHub → Settings → Developer settings → Personal access tokens
+- PyInstaller error → usually a missing hidden import; update `backend/backend.spec`
+- `npm ci` lock file mismatch → run `npm install` locally and commit the updated `package-lock.json`
+
 ## Git workflow
 
 ### When to commit
