@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigation, type Screen } from "./components/Navigation";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { DashboardScreen } from "./screens/dashboard/DashboardScreen";
 import { VolumesScreen } from "./screens/volumes/VolumesScreen";
 import { PersonsScreen } from "./screens/persons/PersonsScreen";
@@ -16,6 +17,11 @@ declare global {
       openDirectory: () => Promise<string | null>;
       savePdf: () => Promise<string | null>;
       exportPdf: (outputPath: string, researcher: string) => Promise<{ file: string }>;
+      onUpdateAvailable?: (cb: (info: { version: string }) => void) => () => void;
+      onUpdateProgress?: (cb: (info: { percent: number }) => void) => () => void;
+      onUpdateDownloaded?: (cb: () => void) => () => void;
+      downloadUpdate?: () => Promise<void>;
+      installUpdate?: () => Promise<void>;
     };
   }
 }
@@ -62,6 +68,7 @@ export function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", direction: "rtl", overflow: "hidden" }}>
+      <UpdateBanner />
       <Navigation active={screen} onNavigate={setScreen} />
       <main
         style={{

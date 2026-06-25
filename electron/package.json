@@ -1,12 +1,15 @@
 {
   "name": "irfan-electron",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "dist/main.js",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs && node launch.mjs",
     "start": "node launch.mjs"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

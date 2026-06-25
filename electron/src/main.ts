@@ -1,4 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { autoUpdater } from "electron-updater";
 import { spawn, ChildProcess } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
@@ -90,7 +91,7 @@ function createWindow(port: number) {
     backgroundColor: "#F7F5EF",
     icon: isDev
       ? path.join(__dirname, "..", "..", "frontend", "public", "irfan_logo.png")
-      : path.join((process as any).resourcesPath as string, "frontend", "dist", "irfan_logo.png"),
+      : path.join((process as any).resourcesPath as string, "icon.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -117,6 +118,9 @@ function createWindow(port: number) {
 }
 
 ipcMain.handle("get-backend-port", () => backendPort);
+
+ipcMain.handle("update:download", () => autoUpdater.downloadUpdate());
+ipcMain.handle("update:install", () => autoUpdater.quitAndInstall());
 
 ipcMain.handle("dialog:open-directory", async () => {
   const result = await dialog.showOpenDialog({
@@ -161,6 +165,7 @@ ipcMain.handle("export:pdf", async (_, { outputPath, researcher }: { outputPath:
 });
 
 app.whenReady().then(async () => {
+  Menu.setApplicationMenu(null);
   const dbPath = path.join(app.getPath("userData"), "archive.db");
 
   // On first launch in production, copy the bundled seed database to userData.
@@ -206,6 +211,30 @@ app.whenReady().then(async () => {
   }
 
   createWindow(backendPort);
+
+  if (!isDev) {
+    autoUpdater.autoDownload = false;
+    autoUpdater.autoInstallOnAppQuit = false;
+
+    autoUpdater.on("update-available", (info) => {
+      mainWindow?.webContents.send("update:available", { version: info.version });
+    });
+
+    autoUpdater.on("download-progress", (progress) => {
+      mainWindow?.webContents.send("update:progress", { percent: Math.round(progress.percent) });
+    });
+
+    autoUpdater.on("update-downloaded", () => {
+      mainWindow?.webContents.send("update:downloaded");
+    });
+
+    autoUpdater.on("error", (err) => {
+      console.error("[updater]", err.message);
+    });
+
+    // Check 3 seconds after launch so the window is visible first
+    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 3000);
+  }
 });
 
 app.on("window-all-closed", () => {

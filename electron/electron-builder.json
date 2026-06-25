@@ -23,6 +23,10 @@
     {
       "from": "../frontend/dist",
       "to": "frontend/dist"
+    },
+    {
+      "from": "resources/icon.ico",
+      "to": "icon.ico"
     }
   ],
   "win": {
@@ -31,7 +35,14 @@
   },
   "nsis": {
     "oneClick": false,
+    "perMachine": false,
     "allowToChangeInstallationDirectory": true,
-    "installerLanguages": ["ar"]
+    "installerLanguages": ["ar"],
+    "defaultInstallationDirectory": "$LOCALAPPDATA\\Programs\\${productName}"
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "imsk236",
+    "repo": "Irfan-browser"
   }
 }

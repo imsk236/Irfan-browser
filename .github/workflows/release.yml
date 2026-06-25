@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install Python deps
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Build backend.exe (PyInstaller)
+        working-directory: backend
+        run: uv run pyinstaller backend.spec --distpath ../electron/resources
+
+      - name: Install Node deps
+        run: npm install
+
+      - name: Build frontend
+        run: npm run build --workspace=frontend
+
+      - name: Build Electron installer and publish to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx electron-builder --win --x64 --project electron --publish always
