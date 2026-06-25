@@ -228,12 +228,18 @@ app.whenReady().then(async () => {
       mainWindow?.webContents.send("update:downloaded");
     });
 
+    autoUpdater.on("update-not-available", () => {
+      dialog.showMessageBox({ message: "لا يوجد تحديث (أنت على أحدث إصدار)", detail: `الإصدار الحالي: ${app.getVersion()}` });
+    });
+
     autoUpdater.on("error", (err) => {
-      console.error("[updater]", err.message);
+      dialog.showErrorBox("خطأ في التحديث", err.message);
     });
 
     // Check 3 seconds after launch so the window is visible first
-    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 3000);
+    setTimeout(() => autoUpdater.checkForUpdates().catch((err) => {
+      dialog.showErrorBox("خطأ في فحص التحديث", String(err));
+    }), 3000);
   }
 });
 
