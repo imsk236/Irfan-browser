@@ -5,7 +5,7 @@ export function Header() {
     <header className="app-header" role="banner">
       <div className="header-brand">
         <img
-          src="/irfan_logo.png"
+          src={`${import.meta.env.BASE_URL}irfan_logo.png`}
           alt="شعار أرشيف عرفان"
           className="header-logo"
         />

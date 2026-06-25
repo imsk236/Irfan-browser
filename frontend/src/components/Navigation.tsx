@@ -22,7 +22,7 @@ export function Navigation({ active, onNavigate }: Props) {
       <div className="nav-brand">
         <div className="nav-logo-wrap">
           <img
-            src="/irfan_logo.png"
+            src={`${import.meta.env.BASE_URL}irfan_logo.png`}
             alt="عرفان"
             className="nav-logo"
             aria-hidden="true"
