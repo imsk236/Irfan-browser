@@ -41,6 +41,12 @@ jobs:
       - name: Build Electron main process
         run: npm run build --workspace=electron
 
+      - name: Delete existing release for this tag (prevents duplicate on re-run)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        shell: pwsh
+        run: gh release delete "${{ github.ref_name }}" --yes; exit 0
+
       - name: Build Electron installer and publish to GitHub Releases
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

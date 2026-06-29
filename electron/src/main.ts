@@ -214,26 +214,36 @@ app.whenReady().then(async () => {
 
   if (!isDev) {
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = false;
+    autoUpdater.autoInstallOnAppQuit = true;
 
     autoUpdater.on("update-available", (info) => {
+      console.log("[updater] update available:", info.version);
       mainWindow?.webContents.send("update:available", { version: info.version });
+    });
+
+    autoUpdater.on("update-not-available", (info) => {
+      console.log("[updater] up to date, current:", app.getVersion(), "latest:", info.version);
+      dialog.showMessageBox({ type: "info", title: "التحديث", message: `النسخة الحالية (${app.getVersion()}) هي الأحدث.`, detail: `أحدث إصدار على GitHub: ${info.version}`, buttons: ["حسناً"] });
     });
 
     autoUpdater.on("download-progress", (progress) => {
       mainWindow?.webContents.send("update:progress", { percent: Math.round(progress.percent) });
     });
 
-    autoUpdater.on("update-downloaded", () => {
+    autoUpdater.on("update-downloaded", (info) => {
+      console.log("[updater] downloaded:", info.version);
       mainWindow?.webContents.send("update:downloaded");
     });
 
     autoUpdater.on("error", (err) => {
+      console.error("[updater] error:", err.message, err.stack);
       dialog.showErrorBox("خطأ في التحديث", err.message);
     });
 
     // Check 3 seconds after launch so the window is visible first
-    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 3000);
+    setTimeout(() => autoUpdater.checkForUpdates().catch((err) => {
+      console.error("[updater] checkForUpdates rejected:", err);
+    }), 3000);
   }
 });
 
