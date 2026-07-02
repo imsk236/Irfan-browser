@@ -211,7 +211,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
       }
 
       // Handle مؤلف
-      const shouldSaveAuthor = !work || replaceAuthor;
+      const shouldSaveAuthor = !existingAuthorRel || replaceAuthor;
       if (shouldSaveAuthor) {
         if (existingAuthorRel) {
           await relationshipsApi.delete(existingAuthorRel.id);
@@ -231,7 +231,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
       }
 
       // Handle ناسخ
-      const shouldSaveScribe = !work || replaceScribe;
+      const shouldSaveScribe = !existingScribeRel || replaceScribe;
       if (shouldSaveScribe) {
         if (existingScribeRel) {
           await relationshipsApi.delete(existingScribeRel.id);
@@ -251,7 +251,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
       }
 
       // Handle منسوخ له (optional)
-      const shouldSaveCopiedFor = !work || replaceCopiedFor;
+      const shouldSaveCopiedFor = !existingCopiedForRel || replaceCopiedFor;
       if (shouldSaveCopiedFor) {
         if (existingCopiedForRel) {
           await relationshipsApi.delete(existingCopiedForRel.id);
