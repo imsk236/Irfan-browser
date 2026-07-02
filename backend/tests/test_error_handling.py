@@ -35,20 +35,22 @@ def test_invalid_vocab_place_key_returns_422(client):
     assert "أرقام" in r.json()["detail"]
 
 
-def test_invalid_annotation_type_returns_422(client):
-    """An unrecognised annotation_type returns 422 with Arabic message."""
+def test_custom_annotation_type_returns_201(client):
+    """A custom (non-vocab) annotation_type is accepted as free text — see
+    docs/adr/0002-annotation-type-role-free-text-other.md."""
     repo_r = client.post("/volumes/repositories", json={"place_key": "1004", "name": "م"})
     vol_r = client.post("/volumes", json={"repository_id": repo_r.json()["id"]})
     r = client.post(
         "/annotations",
         json={"volume_id": vol_r.json()["id"], "annotation_type": "نوع-مخترع"},
     )
-    assert r.status_code == 422
-    assert "غير مقبولة" in r.json()["detail"]
+    assert r.status_code == 201
+    assert r.json()["annotation_type"] == "نوع-مخترع"
 
 
-def test_invalid_role_in_relationship_returns_422(client):
-    """An unrecognised role returns 422 with Arabic message."""
+def test_custom_role_in_relationship_returns_201(client):
+    """A custom (non-vocab) role is accepted as free text — see
+    docs/adr/0002-annotation-type-role-free-text-other.md."""
     repo_r = client.post("/volumes/repositories", json={"place_key": "1005", "name": "م"})
     vol_r = client.post("/volumes", json={"repository_id": repo_r.json()["id"]})
     person_r = client.post("/persons", json={"preferred_name": "شخص"})
@@ -61,7 +63,7 @@ def test_invalid_role_in_relationship_returns_422(client):
             "role": "دور-مخترع",
         },
     )
-    assert r.status_code == 422
-    assert "غير مقبولة" in r.json()["detail"]
+    assert r.status_code == 201
+    assert r.json()["role"] == "دور-مخترع"
 
 

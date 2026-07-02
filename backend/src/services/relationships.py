@@ -2,7 +2,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from ..db.models import PersonRelationship, Annotation, Work
 from .errors import ResourceNotFoundError
-from .vocab import validate_value
 from .activity import log_activity
 
 _AUTHOR_ROLE = "مؤلف"
@@ -41,7 +40,6 @@ def link_person_to_work(
     evidence_annotation_id: int | None = None,
     notes: str | None = None,
 ) -> PersonRelationship:
-    validate_value(session, "role", role)
     _validate_evidence_annotation(session, evidence_annotation_id, None, work_id)
 
     if role == _AUTHOR_ROLE:
@@ -83,7 +81,6 @@ def link_person_to_volume(
     evidence_annotation_id: int | None = None,
     notes: str | None = None,
 ) -> PersonRelationship:
-    validate_value(session, "role", role)
     _validate_evidence_annotation(session, evidence_annotation_id, volume_id, None)
 
     rel = PersonRelationship(

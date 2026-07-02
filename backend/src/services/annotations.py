@@ -2,7 +2,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from ..db.models import Annotation, PersonRelationship, PersonNameVariant
 from .errors import ResourceNotFoundError
-from .vocab import validate_value
 from .activity import log_activity
 
 
@@ -15,8 +14,6 @@ def create_annotation(
     image_location: str | None = None,
     notes: str | None = None,
 ) -> Annotation:
-    validate_value(session, "annotation_type", annotation_type)
-
     annotation = Annotation(
         volume_id=volume_id,
         work_id=work_id,
@@ -37,9 +34,6 @@ def update_annotation(session: Session, annotation_id: int, **kwargs) -> Annotat
     annotation = session.get(Annotation, annotation_id)
     if not annotation:
         raise ResourceNotFoundError("القيد غير موجود")
-
-    if "annotation_type" in kwargs:
-        validate_value(session, "annotation_type", kwargs["annotation_type"])
 
     for key, value in kwargs.items():
         setattr(annotation, key, value)

@@ -130,15 +130,17 @@ def test_create_relationship_invalid_level_422(client, scene):
     assert r.status_code == 422
 
 
-def test_create_relationship_invalid_role_422(client, scene):
+def test_create_relationship_custom_role_201(client, scene):
+    """A custom (non-vocab) role is accepted as free text — see
+    docs/adr/0002-annotation-type-role-free-text-other.md."""
     r = client.post("/relationships", json={
         "person_id": scene["person"].id,
         "level": "volume",
         "volume_id": scene["vol"].id,
         "role": "دور-غير-موجود",
     })
-    assert r.status_code == 422
-    assert any(ord(c) > 0x600 for c in r.json()["detail"])
+    assert r.status_code == 201
+    assert r.json()["role"] == "دور-غير-موجود"
 
 
 # ── DELETE relationship ────────────────────────────────────────────────────────

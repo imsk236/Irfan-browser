@@ -124,13 +124,15 @@ def test_patch_annotation_null_work_id_is_noop(client, scene):
     assert r.json()["work_id"] == scene["work"].id
 
 
-def test_patch_annotation_invalid_type_422(client, scene):
-    """Annotation type not in vocab is rejected."""
+def test_patch_annotation_custom_type_200(client, scene):
+    """A custom (non-vocab) annotation_type is accepted as free text — see
+    docs/adr/0002-annotation-type-role-free-text-other.md."""
     r = client.patch(
         f"/annotations/{scene['milkiyya'].id}",
         json={"annotation_type": "نوع-مخترع-بالكلية"},
     )
-    assert r.status_code == 422
+    assert r.status_code == 200
+    assert r.json()["annotation_type"] == "نوع-مخترع-بالكلية"
 
 
 def test_patch_annotation_404(client):
