@@ -427,6 +427,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
   }
 
   return (
+    <>
     <form onSubmit={submit}>
       <h4 style={{ marginBottom: "var(--space-4)", fontSize: 15 }}>
         {work ? "تعديل العنوان" : "عنوان جديد"}
@@ -791,20 +792,22 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         </button>
       </div>
 
-      {personModalSlot !== null && (
-        <PersonFormModal
-          person={null}
-          initialName={personModalName}
-          onSaved={(person: Person) => {
-            const selected = { person_id: person.id, preferred_name: person.preferred_name, written_form: person.preferred_name };
-            if (personModalSlot === "author") setAuthor(selected);
-            else if (personModalSlot === "scribe") setScribe(selected);
-            else setCopiedFor(selected);
-            setPersonModalSlot(null);
-          }}
-          onCancel={() => setPersonModalSlot(null)}
-        />
-      )}
     </form>
+
+    {personModalSlot !== null && (
+      <PersonFormModal
+        person={null}
+        initialName={personModalName}
+        onSaved={(person: Person) => {
+          const selected = { person_id: person.id, preferred_name: person.preferred_name, written_form: person.preferred_name };
+          if (personModalSlot === "author") setAuthor(selected);
+          else if (personModalSlot === "scribe") setScribe(selected);
+          else setCopiedFor(selected);
+          setPersonModalSlot(null);
+        }}
+        onCancel={() => setPersonModalSlot(null)}
+      />
+    )}
+    </>
   );
 }

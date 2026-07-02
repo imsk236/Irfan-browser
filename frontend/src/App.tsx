@@ -80,11 +80,11 @@ export function App() {
         }}
         role="main"
       >
-        {screen === "dashboard" && <DashboardScreen onNavigate={setScreen} />}
-        {screen === "volumes"   && <VolumesScreen />}
-        {screen === "persons"   && <PersonsScreen />}
-        {screen === "trace"     && <TraceScreen />}
-        {screen === "settings"  && <SettingsScreen />}
+        <div style={{ display: screen === "dashboard" ? "contents" : "none" }}><DashboardScreen onNavigate={setScreen} /></div>
+        <div style={{ display: screen === "volumes"   ? "contents" : "none" }}><VolumesScreen /></div>
+        <div style={{ display: screen === "persons"   ? "contents" : "none" }}><PersonsScreen /></div>
+        <div style={{ display: screen === "trace"     ? "contents" : "none" }}><TraceScreen /></div>
+        <div style={{ display: screen === "settings"  ? "contents" : "none" }}><SettingsScreen /></div>
       </main>
     </div>
   );

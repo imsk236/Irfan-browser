@@ -158,7 +158,7 @@ export function PersonForm({ person, initialName, onSaved, onDeleted, onCancel }
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
-    setPreferredName(person?.preferred_name ?? "");
+    setPreferredName(person?.preferred_name ?? initialName ?? "");
     setIsm(person?.ism ?? "");
     setKunya(person?.kunya ?? "");
     setLaqab(person?.laqab ?? "");
