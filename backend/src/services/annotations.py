@@ -12,6 +12,11 @@ def create_annotation(
     work_id: int | None = None,
     text_as_written: str | None = None,
     image_location: str | None = None,
+    annotation_year: int | None = None,
+    annotation_month: str | None = None,
+    annotation_day: int | None = None,
+    annotation_weekday: str | None = None,
+    annotation_time: str | None = None,
     notes: str | None = None,
 ) -> Annotation:
     annotation = Annotation(
@@ -20,6 +25,11 @@ def create_annotation(
         annotation_type=annotation_type,
         text_as_written=text_as_written,
         image_location=image_location,
+        annotation_year=annotation_year,
+        annotation_month=annotation_month,
+        annotation_day=annotation_day,
+        annotation_weekday=annotation_weekday,
+        annotation_time=annotation_time,
         notes=notes,
     )
     session.add(annotation)

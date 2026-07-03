@@ -44,6 +44,11 @@ export interface Annotation {
   annotation_type: string;
   text_as_written: string | null;
   image_location: string | null;
+  annotation_year: number | null;
+  annotation_month: string | null;
+  annotation_day: number | null;
+  annotation_weekday: string | null;
+  annotation_time: string | null;
   notes: string | null;
 }
 

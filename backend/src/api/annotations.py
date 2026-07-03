@@ -13,6 +13,11 @@ class AnnotationCreate(BaseModel):
     work_id: int | None = None
     text_as_written: str | None = None
     image_location: str | None = None
+    annotation_year: int | None = None
+    annotation_month: str | None = None
+    annotation_day: int | None = None
+    annotation_weekday: str | None = None
+    annotation_time: str | None = None
     notes: str | None = None
 
 
@@ -21,6 +26,11 @@ class AnnotationUpdate(BaseModel):
     work_id: int | None = None
     text_as_written: str | None = None
     image_location: str | None = None
+    annotation_year: int | None = None
+    annotation_month: str | None = None
+    annotation_day: int | None = None
+    annotation_weekday: str | None = None
+    annotation_time: str | None = None
     notes: str | None = None
 
 
@@ -31,6 +41,11 @@ class AnnotationOut(BaseModel):
     annotation_type: str
     text_as_written: str | None
     image_location: str | None
+    annotation_year: int | None
+    annotation_month: str | None
+    annotation_day: int | None
+    annotation_weekday: str | None
+    annotation_time: str | None
     notes: str | None
 
     model_config = {"from_attributes": True}
@@ -47,6 +62,11 @@ def create_annotation(body: AnnotationCreate):
                 work_id=body.work_id,
                 text_as_written=body.text_as_written,
                 image_location=body.image_location,
+                annotation_year=body.annotation_year,
+                annotation_month=body.annotation_month,
+                annotation_day=body.annotation_day,
+                annotation_weekday=body.annotation_weekday,
+                annotation_time=body.annotation_time,
                 notes=body.notes,
             )
             return AnnotationOut.model_validate(annotation)

@@ -46,6 +46,146 @@ interface Props {
   onCancel: () => void;
 }
 
+function PersonRoleSection({
+  roleLabel,
+  required,
+  existingName,
+  replacing,
+  onReplace,
+  onCancelReplace,
+  person,
+  onPersonChange,
+  unknown,
+  onUnknownChange,
+  source,
+  onSourceChange,
+  showCustom,
+  onShowCustomChange,
+  onRequestCreate,
+  work,
+}: {
+  roleLabel: string;
+  required: boolean;
+  existingName: string | null;
+  replacing: boolean;
+  onReplace: () => void;
+  onCancelReplace: () => void;
+  person: SelectedPerson | null;
+  onPersonChange: (p: SelectedPerson | null) => void;
+  unknown: boolean;
+  onUnknownChange: (v: boolean) => void;
+  source: string;
+  onSourceChange: (v: string) => void;
+  showCustom: boolean;
+  onShowCustomChange: (v: boolean) => void;
+  onRequestCreate: (name: string) => void;
+  work: Work | null;
+}) {
+  const selectedOption = SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number])
+    ? source
+    : showCustom ? "مرجع آخر" : null;
+
+  return (
+    <div
+      style={{
+        marginBottom: "var(--space-4)",
+        padding: "var(--space-3)",
+        background: "var(--color-surface-muted)",
+        borderRadius: "var(--radius)",
+        border: "1px solid var(--color-border)",
+      }}
+    >
+      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: "var(--space-2)" }}>
+        {roleLabel} {required && <span style={{ color: "var(--color-error)" }}>*</span>}
+      </div>
+
+      {existingName && !replacing ? (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 14 }}>{existingName}</span>
+          <button type="button" className="btn btn-secondary btn-compact" onClick={onReplace}>
+            تغيير
+          </button>
+        </div>
+      ) : (
+        <>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: "var(--space-2)", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={unknown}
+              onChange={(e) => {
+                onUnknownChange(e.target.checked);
+                if (e.target.checked) onPersonChange(null);
+              }}
+            />
+            مجهول
+          </label>
+
+          {!unknown && (
+            <PersonField
+              label={`من ${roleLabel}؟`}
+              value={person}
+              onChange={onPersonChange}
+              saveVariant
+              onRequestCreate={onRequestCreate}
+            />
+          )}
+
+          {!unknown && person && (
+            <div className="field" style={{ marginTop: "var(--space-3)" }}>
+              <label style={{ fontSize: 12, color: "var(--color-text-muted)" }}>مصدر الصلة</label>
+              <div style={{ display: "flex", gap: "var(--space-5)", marginTop: "var(--space-1)" }}>
+                {(["المخطوط", "المفهرس", "مرجع آخر"] as const).map((opt) => (
+                  <label key={opt} style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", fontSize: 13, cursor: "pointer" }}>
+                    <input
+                      type="radio"
+                      name={`source-${roleLabel}`}
+                      checked={selectedOption === opt}
+                      onChange={() => {
+                        if (opt === "مرجع آخر") {
+                          onShowCustomChange(true);
+                          if (SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number])) {
+                            onSourceChange("");
+                          }
+                        } else {
+                          onShowCustomChange(false);
+                          onSourceChange(opt);
+                        }
+                      }}
+                    />
+                    {opt}
+                  </label>
+                ))}
+              </div>
+              {showCustom && (
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="اذكر المرجع…"
+                  value={SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number]) ? "" : source}
+                  onChange={(e) => onSourceChange(e.target.value)}
+                  style={{ marginTop: "var(--space-2)" }}
+                  autoFocus
+                />
+              )}
+            </div>
+          )}
+
+          {work && replacing && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-compact"
+              style={{ marginTop: "var(--space-2)" }}
+              onClick={onCancelReplace}
+            >
+              إلغاء التغيير
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function WorkForm({ volumeId, work, relationships, personMap, folioCount, onSaved, onCancel }: Props) {
   const [title, setTitle] = useState(work?.title ?? "");
   const [titleSource, setTitleSource] = useState(work?.title_source ?? "");
@@ -288,144 +428,6 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
     ? (personMap?.get(existingCopiedForRel.person_id) ?? `شخص #${existingCopiedForRel.person_id}`)
     : null;
 
-  function PersonRoleSection({
-    roleLabel,
-    required,
-    existingName,
-    replacing,
-    onReplace,
-    onCancelReplace,
-    person,
-    onPersonChange,
-    unknown,
-    onUnknownChange,
-    source,
-    onSourceChange,
-    showCustom,
-    onShowCustomChange,
-    onRequestCreate,
-  }: {
-    roleLabel: string;
-    required: boolean;
-    existingName: string | null;
-    replacing: boolean;
-    onReplace: () => void;
-    onCancelReplace: () => void;
-    person: SelectedPerson | null;
-    onPersonChange: (p: SelectedPerson | null) => void;
-    unknown: boolean;
-    onUnknownChange: (v: boolean) => void;
-    source: string;
-    onSourceChange: (v: string) => void;
-    showCustom: boolean;
-    onShowCustomChange: (v: boolean) => void;
-    onRequestCreate: (name: string) => void;
-  }) {
-    const selectedOption = SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number])
-      ? source
-      : showCustom ? "مرجع آخر" : null;
-
-    return (
-      <div
-        style={{
-          marginBottom: "var(--space-4)",
-          padding: "var(--space-3)",
-          background: "var(--color-surface-muted)",
-          borderRadius: "var(--radius)",
-          border: "1px solid var(--color-border)",
-        }}
-      >
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: "var(--space-2)" }}>
-          {roleLabel} {required && <span style={{ color: "var(--color-error)" }}>*</span>}
-        </div>
-
-        {existingName && !replacing ? (
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 14 }}>{existingName}</span>
-            <button type="button" className="btn btn-secondary btn-compact" onClick={onReplace}>
-              تغيير
-            </button>
-          </div>
-        ) : (
-          <>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: "var(--space-2)", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={unknown}
-                onChange={(e) => {
-                  onUnknownChange(e.target.checked);
-                  if (e.target.checked) onPersonChange(null);
-                }}
-              />
-              مجهول
-            </label>
-
-            {!unknown && (
-              <PersonField
-                label={`من ${roleLabel}؟`}
-                value={person}
-                onChange={onPersonChange}
-                saveVariant
-                onRequestCreate={onRequestCreate}
-              />
-            )}
-
-            {!unknown && person && (
-              <div className="field" style={{ marginTop: "var(--space-3)" }}>
-                <label style={{ fontSize: 12, color: "var(--color-text-muted)" }}>مصدر الصلة</label>
-                <div style={{ display: "flex", gap: "var(--space-5)", marginTop: "var(--space-1)" }}>
-                  {(["المخطوط", "المفهرس", "مرجع آخر"] as const).map((opt) => (
-                    <label key={opt} style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", fontSize: 13, cursor: "pointer" }}>
-                      <input
-                        type="radio"
-                        name={`source-${roleLabel}`}
-                        checked={selectedOption === opt}
-                        onChange={() => {
-                          if (opt === "مرجع آخر") {
-                            onShowCustomChange(true);
-                            if (SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number])) {
-                              onSourceChange("");
-                            }
-                          } else {
-                            onShowCustomChange(false);
-                            onSourceChange(opt);
-                          }
-                        }}
-                      />
-                      {opt}
-                    </label>
-                  ))}
-                </div>
-                {showCustom && (
-                  <input
-                    className="input"
-                    type="text"
-                    placeholder="اذكر المرجع…"
-                    value={SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number]) ? "" : source}
-                    onChange={(e) => onSourceChange(e.target.value)}
-                    style={{ marginTop: "var(--space-2)" }}
-                    autoFocus
-                  />
-                )}
-              </div>
-            )}
-
-            {work && replacing && (
-              <button
-                type="button"
-                className="btn btn-secondary btn-compact"
-                style={{ marginTop: "var(--space-2)" }}
-                onClick={onCancelReplace}
-              >
-                إلغاء التغيير
-              </button>
-            )}
-          </>
-        )}
-      </div>
-    );
-  }
-
   return (
     <>
     <form onSubmit={submit}>
@@ -589,6 +591,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         showCustom={authorCustom}
         onShowCustomChange={setAuthorCustom}
         onRequestCreate={(name) => { setPersonModalSlot("author"); setPersonModalName(name); }}
+        work={work}
       />
 
       {/* الناسخ */}
@@ -608,6 +611,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         showCustom={scribeCustom}
         onShowCustomChange={setScribeCustom}
         onRequestCreate={(name) => { setPersonModalSlot("scribe"); setPersonModalName(name); }}
+        work={work}
       />
 
       {/* منسوخ له (اختياري) */}
@@ -753,10 +757,11 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
           </div>
           <div className="field">
             <label>الوقت</label>
-            <VocabSelect
-              category="copy_time"
+            <input
+              className="input"
+              type="text"
               value={copyTime}
-              onChange={setCopyTime}
+              onChange={(e) => setCopyTime(e.target.value)}
               placeholder="مجهول"
             />
           </div>

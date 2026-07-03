@@ -73,6 +73,11 @@ export const annotationsApi = {
     work_id?: number;
     text_as_written?: string;
     image_location?: string;
+    annotation_year?: number;
+    annotation_month?: string;
+    annotation_day?: number;
+    annotation_weekday?: string;
+    annotation_time?: string;
     notes?: string;
   }) => api.post<Annotation>("/annotations", body),
   update: (id: number, body: Partial<Annotation>) =>

@@ -145,6 +145,11 @@ class Annotation(Base):
     annotation_type = Column(Text, nullable=False)
     text_as_written = Column(Text)
     image_location = Column(Text)
+    annotation_year = Column(Integer)
+    annotation_month = Column(Text)       # one of the 12 Hijri month names
+    annotation_day = Column(Integer)      # 1-30
+    annotation_weekday = Column(Text)     # one of the 7 Arabic weekday names
+    annotation_time = Column(Text)        # free text
     notes = Column(Text)
 
     volume = relationship("Volume", back_populates="annotations")

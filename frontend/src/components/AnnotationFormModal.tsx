@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { annotationsApi, relationshipsApi } from "../api";
 import type { Annotation, Person, Work } from "../api/types";
-import { VocabSelectOrOther } from "./VocabSelect";
+import { VocabSelectOrOther, VocabSelect } from "./VocabSelect";
 import { PersonField } from "./PersonField";
 import { PersonFormModal } from "./PersonFormModal";
 import { FolioInput } from "./FolioInput";
@@ -99,6 +99,13 @@ export function AnnotationFormModal({
   const [imageLocation, setImageLocation] = useState(annotation?.image_location ?? "");
   const [notes, setNotes] = useState(annotation?.notes ?? "");
 
+  // تاريخ القيد
+  const [annotationYear, setAnnotationYear] = useState(annotation?.annotation_year?.toString() ?? "");
+  const [annotationMonth, setAnnotationMonth] = useState(annotation?.annotation_month ?? "");
+  const [annotationDay, setAnnotationDay] = useState(annotation?.annotation_day?.toString() ?? "");
+  const [annotationWeekday, setAnnotationWeekday] = useState(annotation?.annotation_weekday ?? "");
+  const [annotationTime, setAnnotationTime] = useState(annotation?.annotation_time ?? "");
+
   const [existingPersons, setExistingPersons] = useState<ExistingPerson[]>([]);
   const [removedRelIds, setRemovedRelIds] = useState<number[]>([]);
   const [pendingPersons, setPendingPersons] = useState<PendingPerson[]>([]);
@@ -165,6 +172,30 @@ export function AnnotationFormModal({
         return;
       }
     }
+
+    // تاريخ القيد coherence: day requires month, month requires year
+    if (annotationDay && !annotationMonth) {
+      setError("لا يمكن إدخال التاريخ بدون شهر");
+      return;
+    }
+    if (annotationMonth && !annotationYear) {
+      setError("لا يمكن إدخال الشهر بدون سنة");
+      return;
+    }
+    if (annotationYear) {
+      const yr = parseInt(annotationYear);
+      if (isNaN(yr) || yr < 1 || yr > 1500) {
+        setError("السنة الهجرية يجب أن تكون بين 1 و 1500");
+        return;
+      }
+    }
+    if (annotationDay) {
+      const d = parseInt(annotationDay);
+      if (isNaN(d) || d < 1 || d > 30) {
+        setError("التاريخ يجب أن يكون بين 1 و 30");
+        return;
+      }
+    }
     // Include any person staged in the input but not yet added via the إضافة button
     const effectivePending = (() => {
       if (!stagePerson) return pendingPersons;
@@ -183,6 +214,11 @@ export function AnnotationFormModal({
         work_id: workId ? parseInt(workId) : undefined,
         text_as_written: textAsWritten || undefined,
         image_location: imageLocation || undefined,
+        annotation_year: annotationYear ? parseInt(annotationYear) : undefined,
+        annotation_month: annotationMonth || undefined,
+        annotation_day: annotationDay ? parseInt(annotationDay) : undefined,
+        annotation_weekday: annotationWeekday || undefined,
+        annotation_time: annotationTime || undefined,
         notes: notes || undefined,
       };
 
@@ -264,6 +300,75 @@ export function AnnotationFormModal({
             <div className="field">
               <label>موضع اللوحة</label>
               <FolioInput value={imageLocation} onChange={setImageLocation} folioCount={folioCount} />
+            </div>
+          </div>
+
+          {/* تاريخ القيد */}
+          <div
+            style={{
+              marginBottom: "var(--space-4)",
+              padding: "var(--space-3)",
+              background: "var(--color-surface-muted)",
+              borderRadius: "var(--radius)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: "var(--space-3)" }}>
+              تاريخ القيد
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
+              <div className="field">
+                <label>السنة (هـ)</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="1"
+                  max="1500"
+                  value={annotationYear}
+                  onChange={(e) => setAnnotationYear(e.target.value)}
+                  placeholder="مجهول"
+                />
+              </div>
+              <div className="field">
+                <label>الشهر</label>
+                <VocabSelect
+                  category="hijri_month"
+                  value={annotationMonth}
+                  onChange={setAnnotationMonth}
+                  placeholder="مجهول"
+                />
+              </div>
+              <div className="field">
+                <label>التاريخ</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="1"
+                  max="30"
+                  value={annotationDay}
+                  onChange={(e) => setAnnotationDay(e.target.value)}
+                  placeholder="مجهول"
+                />
+              </div>
+              <div className="field">
+                <label>اليوم</label>
+                <VocabSelect
+                  category="weekday"
+                  value={annotationWeekday}
+                  onChange={setAnnotationWeekday}
+                  placeholder="مجهول"
+                />
+              </div>
+              <div className="field">
+                <label>الوقت</label>
+                <input
+                  className="input"
+                  type="text"
+                  value={annotationTime}
+                  onChange={(e) => setAnnotationTime(e.target.value)}
+                  placeholder="مجهول"
+                />
+              </div>
             </div>
           </div>
 
