@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { volumesApi, worksApi, annotationsApi, relationshipsApi, personsApi } from "../../api";
 import type { Annotation, Person, Relationship, Repository, Volume, Work } from "../../api/types";
+import { AnnotationDetailModal } from "../../components/AnnotationDetailModal";
 import { AnnotationFormModal } from "../../components/AnnotationFormModal";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { WorkDetailModal } from "../../components/WorkDetailModal";
 import { WorkFormModal } from "../../components/WorkFormModal";
 import { VolumeForm } from "./VolumeForm";
 
@@ -19,6 +21,7 @@ export function VolumesScreen() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [selected, setSelected] = useState<Volume | null>(null);
   const [loadError, setLoadError] = useState("");
+  const [repoFilter, setRepoFilter] = useState<number | "all">("all");
   const [search, setSearch] = useState("");
 
   const [works, setWorks] = useState<Work[]>([]);
@@ -31,10 +34,12 @@ export function VolumesScreen() {
   // Work form
   const [showWorkForm, setShowWorkForm] = useState(false);
   const [editingWork, setEditingWork] = useState<Work | null>(null);
+  const [viewingWork, setViewingWork] = useState<Work | null>(null);
 
   // Annotation form
   const [showAnnotationForm, setShowAnnotationForm] = useState(false);
   const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
+  const [viewingAnnotation, setViewingAnnotation] = useState<Annotation | null>(null);
 
   // Confirm modal
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
@@ -42,11 +47,12 @@ export function VolumesScreen() {
   const personMap = new Map(persons.map((p) => [p.id, p.preferred_name]));
 
   const filteredVolumes = volumes.filter((v) => {
+    if (repoFilter !== "all" && v.repository_id !== repoFilter) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
-      v.serial.toLowerCase().includes(q) ||
-      (v.repository_volume_number != null && String(v.repository_volume_number).includes(q))
+      (v.repository_volume_number != null && String(v.repository_volume_number).includes(q)) ||
+      v.serial.toLowerCase().includes(q)
     );
   });
 
@@ -67,6 +73,8 @@ export function VolumesScreen() {
     setVolumeFormMode("none");
     setShowWorkForm(false);
     setShowAnnotationForm(false);
+    setViewingWork(null);
+    setViewingAnnotation(null);
     const [w, a, r] = await Promise.all([
       worksApi.listForVolume(v.id),
       annotationsApi.listForVolume(v.id),
@@ -220,6 +228,7 @@ export function VolumesScreen() {
   }
 
   const repoName = (id: number) => repos.find((r) => r.id === id)?.name ?? "—";
+  const selectedRepo = selected ? repos.find((r) => r.id === selected.repository_id) : undefined;
 
   // Volume-level relationships (not linked to specific work)
   const volumeRelationships = relationships.filter((r) => r.level === "volume");
@@ -260,19 +269,42 @@ export function VolumesScreen() {
             + مجلد جديد
           </button>
         </div>
-        <div style={{ padding: "var(--space-3) var(--space-4)", borderBottom: "1px solid var(--color-border)", flexShrink: 0 }}>
+        <div
+          style={{
+            padding: "var(--space-3) var(--space-4)",
+            borderBottom: "1px solid var(--color-border)",
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-2)",
+          }}
+        >
+          <select
+            className="select"
+            value={repoFilter}
+            onChange={(e) => setRepoFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+          >
+            <option value="all">كل الخزائن</option>
+            {repos.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
           <input
             className="input"
             type="text"
-            placeholder="بحث بالرمز أو الرقم…"
+            placeholder="بحث برقم المجلد…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: "100%" }}
+            style={{ width: "100%", fontSize: 15, fontWeight: 500 }}
           />
         </div>
         <div style={{ overflowY: "auto", flex: 1 }}>
           {filteredVolumes.length === 0 ? (
-            <p className="empty-state">{search.trim() ? "لا توجد نتائج" : "لا توجد مجلدات بعد."}</p>
+            <p className="empty-state">
+              {search.trim() || repoFilter !== "all" ? "لا توجد نتائج" : "لا توجد مجلدات بعد."}
+            </p>
           ) : (
             <ul style={{ listStyle: "none" }}>
               {filteredVolumes.map((v) => (
@@ -288,14 +320,23 @@ export function VolumesScreen() {
                       selected?.id === v.id ? "3px solid var(--color-selected-marker)" : undefined,
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span className="serial-badge">{v.serial}</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>
-                    {repoName(v.repository_id)}
-                    {v.repository_volume_number != null && (
-                      <div>رقم المجلد: {v.repository_volume_number}</div>
-                    )}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: "var(--space-2)",
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: "var(--font-size-body)", fontWeight: 600, color: "var(--color-text)" }}>
+                        {v.repository_volume_number != null ? `رقم ${v.repository_volume_number}` : "—"}
+                      </div>
+                      <div style={{ fontSize: "var(--font-size-meta)", color: "var(--color-text-muted)", marginTop: 2 }}>
+                        {repoName(v.repository_id)}
+                      </div>
+                    </div>
+                    <span className="serial-badge" style={{ flexShrink: 0 }}>{v.serial}</span>
                   </div>
                 </li>
               ))}
@@ -337,22 +378,56 @@ export function VolumesScreen() {
         {/* Volume detail view */}
         {selected && volumeFormMode === "none" && (
           <>
-            {/* ── بيانات المجلد ─────────────────────────── */}
-            <div style={{ marginBottom: "var(--space-6)" }}>
+            {/* ── بيانات المجلد (summary header) ─────────── */}
+            <header
+              style={{
+                marginBottom: "var(--space-6)",
+                paddingBottom: "var(--space-5)",
+                borderBottom: "1px solid var(--color-border)",
+              }}
+            >
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "flex-start",
-                  marginBottom: "var(--space-3)",
+                  gap: "var(--space-4)",
                 }}
               >
-                <div>
-                  <span className="serial-badge" style={{ fontSize: 18 }}>
+                <div style={{ minWidth: 0 }}>
+                  <span className="serial-badge" style={{ fontSize: 16 }}>
                     {selected.serial}
                   </span>
+                  <h2 style={{ fontSize: "var(--font-size-section)", fontWeight: 600, marginTop: "var(--space-3)", marginBottom: 0 }}>
+                    {selectedRepo?.name ?? "—"}
+                    {selectedRepo?.location && (
+                      <span
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 400,
+                          color: "var(--color-text-muted)",
+                          marginInlineStart: "var(--space-2)",
+                        }}
+                      >
+                        · {selectedRepo.location}
+                      </span>
+                    )}
+                  </h2>
+                  {selectedRepo?.notes && (
+                    <p
+                      style={{
+                        fontSize: 13,
+                        color: "var(--color-text-muted)",
+                        marginTop: "var(--space-1)",
+                        maxWidth: 640,
+                        lineHeight: 1.7,
+                      }}
+                    >
+                      {selectedRepo.notes}
+                    </p>
+                  )}
                 </div>
-                <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0 }}>
                   <button
                     className="btn btn-secondary btn-compact"
                     onClick={() => setVolumeFormMode("edit")}
@@ -367,29 +442,69 @@ export function VolumesScreen() {
                   </button>
                 </div>
               </div>
-              <div style={{ fontSize: 14, color: "var(--color-text-muted)", marginBottom: "var(--space-2)" }}>
-                الخزانة: {repoName(selected.repository_id)}
-                {selected.folio_count && ` · ${selected.folio_count} ورقة`}
-                {selected.repository_volume_number != null && (
-                  <div>رقم المجلد: {selected.repository_volume_number}</div>
-                )}
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "var(--space-2) var(--space-7)",
+                  marginTop: "var(--space-4)",
+                }}
+              >
+                <MetaItem
+                  label="رقم المجلد في الخزانة"
+                  value={
+                    selected.repository_volume_number != null
+                      ? String(selected.repository_volume_number)
+                      : null
+                  }
+                />
+                <MetaItem
+                  label="عدد الأوراق"
+                  value={selected.folio_count != null ? `${selected.folio_count} ورقة` : null}
+                />
               </div>
+
               {selected.notes && (
-                <p style={{ fontSize: 14, maxWidth: 640, lineHeight: 1.7 }}>{selected.notes}</p>
+                <div style={{ marginTop: "var(--space-4)" }}>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: 12,
+                      color: "var(--color-text-muted)",
+                      marginBottom: 2,
+                    }}
+                  >
+                    ملاحظات
+                  </span>
+                  <p style={{ fontSize: 14, maxWidth: 640, lineHeight: 1.7 }}>{selected.notes}</p>
+                </div>
               )}
-            </div>
+            </header>
 
             {/* ── العناوين (Works) ───────────────────────── */}
-            <div style={{ marginBottom: "var(--space-6)" }}>
+            <section style={{ marginBottom: "var(--space-7)" }}>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   marginBottom: "var(--space-3)",
+                  paddingBottom: "var(--space-2)",
+                  borderBottom: "1px solid var(--color-border)",
                 }}
               >
-                <span className="section-heading" style={{ marginBottom: 0 }}>العناوين</span>
+                <span
+                  className="section-heading"
+                  style={{ marginBottom: 0, paddingBottom: 0, borderBottom: "none" }}
+                >
+                  العناوين
+                  {works.length > 0 && (
+                    <span style={{ fontWeight: 500, marginInlineStart: "var(--space-2)" }}>
+                      · {works.length}
+                    </span>
+                  )}
+                </span>
                 <button
                   className="btn btn-secondary btn-compact"
                   onClick={() => {
@@ -413,6 +528,20 @@ export function VolumesScreen() {
                     setShowWorkForm(false);
                     setEditingWork(null);
                   }}
+                />
+              )}
+
+              {viewingWork && (
+                <WorkDetailModal
+                  work={viewingWork}
+                  relationships={workRelationships}
+                  personMap={personMap}
+                  onEdit={() => {
+                    setEditingWork(viewingWork);
+                    setShowWorkForm(true);
+                    setViewingWork(null);
+                  }}
+                  onClose={() => setViewingWork(null)}
                 />
               )}
 
@@ -446,7 +575,11 @@ export function VolumesScreen() {
                         ? (personMap.get(scribeRel.person_id) ?? `#${scribeRel.person_id}`)
                         : "مجهول";
                       return (
-                        <tr key={w.id}>
+                        <tr
+                          key={w.id}
+                          onClick={() => setViewingWork(w)}
+                          style={{ cursor: "pointer" }}
+                        >
                           <td>{w.title}</td>
                           <td>
                             {w.start_unit && w.end_unit
@@ -459,7 +592,8 @@ export function VolumesScreen() {
                             <button
                               className="btn btn-secondary btn-compact"
                               style={{ marginInlineEnd: 6 }}
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setEditingWork(w);
                                 setShowWorkForm(true);
                               }}
@@ -468,7 +602,10 @@ export function VolumesScreen() {
                             </button>
                             <button
                               className="btn btn-danger btn-compact"
-                              onClick={() => deleteWork(w)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteWork(w);
+                              }}
                             >
                               حذف
                             </button>
@@ -479,19 +616,31 @@ export function VolumesScreen() {
                   </tbody>
                 </table>
               )}
-            </div>
+            </section>
 
             {/* ── القيود (Annotations) ───────────────────── */}
-            <div style={{ marginBottom: "var(--space-6)" }}>
+            <section style={{ marginBottom: "var(--space-7)" }}>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   marginBottom: "var(--space-3)",
+                  paddingBottom: "var(--space-2)",
+                  borderBottom: "1px solid var(--color-border)",
                 }}
               >
-                <span className="section-heading" style={{ marginBottom: 0 }}>القيود</span>
+                <span
+                  className="section-heading"
+                  style={{ marginBottom: 0, paddingBottom: 0, borderBottom: "none" }}
+                >
+                  القيود
+                  {annotations.length > 0 && (
+                    <span style={{ fontWeight: 500, marginInlineStart: "var(--space-2)" }}>
+                      · {annotations.length}
+                    </span>
+                  )}
+                </span>
                 <button
                   className="btn btn-secondary btn-compact"
                   onClick={startNewAnnotation}
@@ -512,6 +661,21 @@ export function VolumesScreen() {
                     setShowAnnotationForm(false);
                     setEditingAnnotation(null);
                   }}
+                />
+              )}
+
+              {viewingAnnotation && (
+                <AnnotationDetailModal
+                  annotation={viewingAnnotation}
+                  works={works}
+                  relationships={volumeRelationships}
+                  personMap={personMap}
+                  onEdit={() => {
+                    setEditingAnnotation(viewingAnnotation);
+                    setShowAnnotationForm(true);
+                    setViewingAnnotation(null);
+                  }}
+                  onClose={() => setViewingAnnotation(null)}
                 />
               )}
 
@@ -536,7 +700,11 @@ export function VolumesScreen() {
                         (r) => r.evidence_annotation_id === a.id
                       );
                       return (
-                        <tr key={a.id}>
+                        <tr
+                          key={a.id}
+                          onClick={() => setViewingAnnotation(a)}
+                          style={{ cursor: "pointer" }}
+                        >
                           <td>{a.annotation_type}</td>
                           <td style={{ fontSize: 13 }}>
                             {a.work_id ? (works.find((w) => w.id === a.work_id)?.title ?? "—") : "—"}
@@ -552,7 +720,10 @@ export function VolumesScreen() {
                                       type="button"
                                       className="btn btn-danger btn-compact"
                                       style={{ fontSize: 10, padding: "1px 4px" }}
-                                      onClick={() => deleteRelationship(r)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteRelationship(r);
+                                      }}
                                     >
                                       ×
                                     </button>
@@ -566,13 +737,19 @@ export function VolumesScreen() {
                             <button
                               className="btn btn-secondary btn-compact"
                               style={{ marginInlineEnd: 6 }}
-                              onClick={() => startEditAnnotation(a)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditAnnotation(a);
+                              }}
                             >
                               تعديل
                             </button>
                             <button
                               className="btn btn-danger btn-compact"
-                              onClick={() => deleteAnnotation(a)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteAnnotation(a);
+                              }}
                             >
                               حذف
                             </button>
@@ -583,7 +760,7 @@ export function VolumesScreen() {
                   </tbody>
                 </table>
               )}
-            </div>
+            </section>
           </>
         )}
 
@@ -607,6 +784,24 @@ export function VolumesScreen() {
           onCancel={dismissConfirm}
         />
       )}
+    </div>
+  );
+}
+
+function MetaItem({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <span
+        style={{
+          display: "block",
+          fontSize: 12,
+          color: "var(--color-text-muted)",
+          marginBottom: 2,
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ fontSize: 14, fontWeight: 500 }}>{value ?? "—"}</span>
     </div>
   );
 }
