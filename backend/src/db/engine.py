@@ -46,6 +46,12 @@ def init_db():
 
     ini_path = os.path.join(base_dir, "alembic.ini")
     alembic_cfg = AlembicConfig(ini_path)
+    # script_location in alembic.ini is the bare relative string "migrations",
+    # which Alembic resolves against the process's cwd, not the ini file's own
+    # directory. That happens to coincide in dev/tests but not in the packaged
+    # app (Electron spawns backend.exe without setting a cwd), so force it
+    # absolute here rather than relying on cwd matching base_dir.
+    alembic_cfg.set_main_option("script_location", os.path.join(base_dir, "migrations"))
     alembic_command.upgrade(alembic_cfg, "head")
 
     engine = get_engine()
