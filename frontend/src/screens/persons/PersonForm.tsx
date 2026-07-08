@@ -262,7 +262,7 @@ export function PersonForm({ person, initialName, onSaved, onDeleted, onCancel }
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
         <div className="field">
-          <label>الاسم (إسم)</label>
+          <label>الاسم</label>
           <input className="input" type="text" value={ism} onChange={(e) => setIsm(e.target.value)} placeholder="مثال: محمد" />
         </div>
         <div className="field">
@@ -270,7 +270,7 @@ export function PersonForm({ person, initialName, onSaved, onDeleted, onCancel }
           <input className="input" type="text" value={kunya} onChange={(e) => setKunya(e.target.value)} placeholder="مثال: أبو عبد الله" />
         </div>
         <div className="field">
-          <label>اللقب</label>
+          <label>القبيلة</label>
           <input className="input" type="text" value={laqab} onChange={(e) => setLaqab(e.target.value)} />
         </div>
         <div className="field">
@@ -282,7 +282,7 @@ export function PersonForm({ person, initialName, onSaved, onDeleted, onCancel }
           <input className="input" type="text" value={nisba2} onChange={(e) => setNisba2(e.target.value)} />
         </div>
         <div className="field">
-          <label>المعروف بـ</label>
+          <label>اللقب</label>
           <input className="input" type="text" value={knownAs} onChange={(e) => setKnownAs(e.target.value)} />
         </div>
         <div className="field" style={{ gridColumn: "1 / -1" }}>
