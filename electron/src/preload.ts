@@ -7,6 +7,19 @@ contextBridge.exposeInMainWorld("archive", {
   openDirectory: (): Promise<string | null> =>
     ipcRenderer.invoke("dialog:open-directory"),
 
+  getDbPath: (): Promise<string> => ipcRenderer.invoke("db:get-path"),
+
+  chooseDbLocation: (): Promise<
+    | { status: "unchanged" | "adopt" | "new"; path: string }
+    | { status: "conflict"; path: string; foundPath: string }
+    | null
+  > => ipcRenderer.invoke("db:choose-location"),
+
+  confirmDbLocation: (targetPath: string): Promise<void> =>
+    ipcRenderer.invoke("db:confirm-location", targetPath),
+
+  restartApp: (): Promise<void> => ipcRenderer.invoke("app:restart"),
+
   savePdf: (): Promise<string | null> =>
     ipcRenderer.invoke("dialog:save-pdf"),
 

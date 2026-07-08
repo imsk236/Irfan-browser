@@ -120,6 +120,29 @@ def test_stamp_existing_db_then_upgrade(temp_db):
     assert version == "014_annotation_date"
 
 
+def test_upgrade_head_on_create_all_db_without_stamp(temp_db):
+    """Simulates a production client db: created via Base.metadata.create_all()
+    (no alembic_version table, never stamped), then init_db() calls upgrade
+    head directly. Relies on every migration's existence-guarded upgrade()
+    to no-op on tables/columns that already exist from create_all."""
+    from src.db.models import Base
+    url = "sqlite:///" + temp_db.replace("\\", "/")
+    engine = create_engine(url)
+    Base.metadata.create_all(engine)
+    engine.dispose()
+
+    _run_alembic(["upgrade", "head"], temp_db)
+
+    engine = create_engine(url)
+    with engine.connect() as conn:
+        version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+        cols = {r[1] for r in conn.execute(text("PRAGMA table_info(persons)")).fetchall()}
+    engine.dispose()
+
+    assert version == "014_annotation_date"
+    assert "nasab" in cols
+
+
 def test_downgrade_to_baseline_drops_new_columns(temp_db):
     """Downgrading from 002 to 001 removes the biographical columns."""
     _run_alembic(["upgrade", "head"], temp_db)

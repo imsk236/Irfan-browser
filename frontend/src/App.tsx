@@ -16,6 +16,14 @@ declare global {
       getBackendPort: () => Promise<number>;
       openDirectory: () => Promise<string | null>;
       savePdf: () => Promise<string | null>;
+      getDbPath?: () => Promise<string>;
+      chooseDbLocation?: () => Promise<
+        | { status: "unchanged" | "adopt" | "new"; path: string }
+        | { status: "conflict"; path: string; foundPath: string }
+        | null
+      >;
+      confirmDbLocation?: (targetPath: string) => Promise<void>;
+      restartApp?: () => Promise<void>;
       exportPdf: (outputPath: string, researcher: string) => Promise<{ file: string }>;
       onUpdateAvailable?: (cb: (info: { version: string }) => void) => () => void;
       onUpdateProgress?: (cb: (info: { percent: number }) => void) => () => void;

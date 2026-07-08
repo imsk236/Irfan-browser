@@ -1,7 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('src\\assets', 'src\\assets')]
+datas = [
+    ('src\\assets', 'src\\assets'),
+    ('migrations', 'migrations'),
+    ('alembic.ini', '.'),
+]
 binaries = []
 hiddenimports = ['email.mime.text', 'email.mime.multipart']
 tmp_ret = collect_all('fastapi')
@@ -15,6 +19,8 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('openpyxl')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('pillow')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('alembic')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 

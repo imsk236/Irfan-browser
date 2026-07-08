@@ -202,6 +202,17 @@ export function SettingsScreen() {
   const [pdfState, setPdfState] = useState<ExportState>("idle");
   const [pdfMsg, setPdfMsg] = useState("");
 
+  // Database location state
+  const [dbPath, setDbPath] = useState("");
+  const [dbPending, setDbPending] = useState<{ path: string; existed: boolean } | null>(null);
+  const [dbConflict, setDbConflict] = useState<{ path: string; foundPath: string } | null>(null);
+
+  useEffect(() => {
+    if (window.archive?.getDbPath) {
+      window.archive.getDbPath().then(setDbPath);
+    }
+  }, []);
+
   // Keep exportFolder in sync when defaultFolder changes
   const prevDefault = useRef(defaultFolder);
   useEffect(() => {
@@ -290,6 +301,31 @@ export function SettingsScreen() {
     if (!window.archive?.savePdf) return;
     const chosen = await window.archive.savePdf();
     if (chosen) setPdfPath(chosen);
+  }
+
+  async function chooseDbLocation() {
+    if (!window.archive?.chooseDbLocation) return;
+    const result = await window.archive.chooseDbLocation();
+    if (!result || result.status === "unchanged") return;
+
+    if (result.status === "conflict") {
+      setDbConflict({ path: result.path, foundPath: result.foundPath });
+      return;
+    }
+
+    await window.archive.confirmDbLocation?.(result.path);
+    setDbPending({ path: result.path, existed: result.status === "adopt" });
+  }
+
+  async function resolveDbConflict(chosenPath: string) {
+    if (!dbConflict) return;
+    await window.archive?.confirmDbLocation?.(chosenPath);
+    setDbPending({ path: chosenPath, existed: chosenPath === dbConflict.foundPath });
+    setDbConflict(null);
+  }
+
+  async function restartApp() {
+    await window.archive?.restartApp?.();
   }
 
   return (
@@ -456,6 +492,99 @@ export function SettingsScreen() {
                 يُستخدم تلقائياً عند فتح تبويب التصدير
               </p>
             </div>
+
+            {/* Database location */}
+            {window.archive?.getDbPath && (
+              <div>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: "var(--space-2)" }}>
+                  موقع قاعدة البيانات
+                </label>
+                <div
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: 12,
+                    direction: "ltr",
+                    textAlign: "left",
+                    wordBreak: "break-all",
+                    background: "var(--color-surface-muted)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "6px 10px",
+                    marginBottom: "var(--space-2)",
+                  }}
+                >
+                  {dbPath || "…"}
+                </div>
+                <button className="btn btn-secondary btn-compact" type="button" onClick={chooseDbLocation}>
+                  نقل قاعدة البيانات إلى موقع آخر
+                </button>
+                <p style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: "var(--space-2)", lineHeight: 1.6 }}>
+                  يمكن نقل قاعدة البيانات إلى قرص خارجي لاستخدامها من أكثر من جهاز. استخدم القرص من جهاز واحد
+                  في كل مرة، وأغلق البرنامج بالكامل قبل فصل القرص لتفادي تلف البيانات.
+                </p>
+
+                {dbConflict && (
+                  <div
+                    style={{
+                      marginTop: "var(--space-3)",
+                      fontSize: 13,
+                      background: "#fdecea",
+                      border: "1px solid #f5c0ba",
+                      borderRadius: "var(--radius-sm)",
+                      padding: "10px 12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "var(--space-2)",
+                    }}
+                  >
+                    <span>
+                      يوجد بالفعل قاعدة بيانات أخرى على هذا القرص في موقع مختلف:
+                    </span>
+                    <span style={{ fontFamily: "monospace", fontSize: 12, direction: "ltr", textAlign: "left", wordBreak: "break-all" }}>
+                      {dbConflict.foundPath}
+                    </span>
+                    <span>
+                      هل تقصد استخدام هذه القاعدة (على الأرجح أُعدَّت من جهاز آخر)، أم إنشاء قاعدة جديدة في الموقع الذي اخترته؟
+                    </span>
+                    <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                      <button className="btn btn-primary btn-compact" type="button" onClick={() => resolveDbConflict(dbConflict.foundPath)}>
+                        استخدام القاعدة الموجودة
+                      </button>
+                      <button className="btn btn-secondary btn-compact" type="button" onClick={() => resolveDbConflict(dbConflict.path)}>
+                        إنشاء قاعدة جديدة هنا
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {dbPending && (
+                  <div
+                    style={{
+                      marginTop: "var(--space-3)",
+                      fontSize: 13,
+                      background: "#fff8e6",
+                      border: "1px solid #f0ddab",
+                      borderRadius: "var(--radius-sm)",
+                      padding: "10px 12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "var(--space-2)",
+                    }}
+                  >
+                    <span>
+                      {dbPending.existed
+                        ? "تم العثور على قاعدة بيانات موجودة في هذا الموقع. سيتم استخدامها بعد إعادة تشغيل البرنامج."
+                        : "سيتم نسخ قاعدة البيانات الحالية إلى هذا الموقع بعد إعادة تشغيل البرنامج."}
+                    </span>
+                    <div>
+                      <button className="btn btn-primary btn-compact" type="button" onClick={restartApp}>
+                        إعادة التشغيل الآن
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
               <button className="btn btn-primary" type="button" onClick={saveSettings}>

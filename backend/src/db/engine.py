@@ -1,7 +1,6 @@
 import os
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
-from .models import Base
 
 _engine = None
 _SessionLocal = None
@@ -35,20 +34,19 @@ def init_db():
     import os
     import sys
 
-    if getattr(sys, "frozen", False):
-        # PyInstaller bundle: Alembic files are not available; use SQLAlchemy
-        # create_all instead (no-op when the pre-seeded DB already has all tables).
-        engine = get_engine()
-        Base.metadata.create_all(engine)
-    else:
-        from alembic.config import Config as AlembicConfig
-        from alembic import command as alembic_command
+    from alembic.config import Config as AlembicConfig
+    from alembic import command as alembic_command
 
-        ini_path = os.path.normpath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "alembic.ini")
-        )
-        alembic_cfg = AlembicConfig(ini_path)
-        alembic_command.upgrade(alembic_cfg, "head")
+    if getattr(sys, "frozen", False):
+        # PyInstaller bundle: alembic.ini and migrations/ are bundled as datas
+        # at the same relative layout, extracted under sys._MEIPASS.
+        base_dir = sys._MEIPASS
+    else:
+        base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+    ini_path = os.path.join(base_dir, "alembic.ini")
+    alembic_cfg = AlembicConfig(ini_path)
+    alembic_command.upgrade(alembic_cfg, "head")
 
     engine = get_engine()
     with engine.connect() as conn:

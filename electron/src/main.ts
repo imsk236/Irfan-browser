@@ -9,6 +9,141 @@ const isDev = !app.isPackaged;
 let backendProcess: ChildProcess | null = null;
 let backendPort = 0;
 let mainWindow: BrowserWindow | null = null;
+let currentDbPath = "";
+
+// ── Database location config ─────────────────────────────────────────────────
+// Persisted separately from the db itself (in userData/config.json) so the
+// custom location is known before the backend spawns and before any renderer
+// loads. `dbPath` is the active custom location (if any); `pendingDbPath` is
+// set by the Settings UI and applied once, on the next app start, before the
+// backend is spawned — never while it's live.
+
+interface AppConfig {
+  dbPath?: string;
+  pendingDbPath?: string;
+}
+
+function configPath(): string {
+  return path.join(app.getPath("userData"), "config.json");
+}
+
+function readConfig(): AppConfig {
+  try {
+    return JSON.parse(fs.readFileSync(configPath(), "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeConfig(config: AppConfig): void {
+  fs.writeFileSync(configPath(), JSON.stringify(config, null, 2), "utf-8");
+}
+
+function copyDbFile(fromPath: string, toPath: string): void {
+  fs.mkdirSync(path.dirname(toPath), { recursive: true });
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const src = fromPath + suffix;
+    if (fs.existsSync(src)) fs.copyFileSync(src, toPath + suffix);
+  }
+}
+
+/**
+ * Bounded search for an existing archive.db elsewhere on the same drive as
+ * `exclude`, starting from the drive root. Guards against picking a different
+ * folder than a previous device used, which would otherwise silently create
+ * a second, diverging database on the same drive. Depth- and entry-limited
+ * so it can't hang on a large external drive full of unrelated files.
+ */
+function findExistingArchiveDb(
+  root: string,
+  exclude: string,
+  maxDepth = 4,
+  maxEntries = 20000
+): string | null {
+  const excludeNorm = path.normalize(exclude);
+  let visited = 0;
+
+  function walk(dir: string, depth: number): string | null {
+    if (depth > maxDepth) return null;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return null;
+    }
+    for (const entry of entries) {
+      if (visited++ > maxEntries) return null;
+      if (entry.isSymbolicLink()) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isFile() && entry.name === "archive.db") {
+        if (path.normalize(full) !== excludeNorm) return full;
+        continue;
+      }
+      if (entry.isDirectory() && !entry.name.startsWith(".")) {
+        const found = walk(full, depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  return walk(root, 0);
+}
+
+/**
+ * Applies a pending relocation requested via Settings, before this session's
+ * dbPath is resolved. If the target already has an archive.db (the drive was
+ * already set up from another device), adopt it as-is rather than overwrite.
+ * Otherwise copy the currently active database there.
+ */
+function applyPendingRelocation(config: AppConfig, defaultDbPath: string): AppConfig {
+  if (!config.pendingDbPath) return config;
+
+  const target = config.pendingDbPath;
+  const active = config.dbPath || defaultDbPath;
+
+  try {
+    if (!fs.existsSync(target)) {
+      copyDbFile(active, target);
+    }
+    const next: AppConfig = { dbPath: target };
+    writeConfig(next);
+    return next;
+  } catch (err) {
+    dialog.showErrorBox(
+      "تعذّر نقل قاعدة البيانات",
+      `لم يتمكن البرنامج من نقل قاعدة البيانات إلى الموقع الجديد. سيستمر استخدام الموقع السابق.\n\n${String(err)}`
+    );
+    const next: AppConfig = { dbPath: config.dbPath };
+    writeConfig(next);
+    return next;
+  }
+}
+
+/**
+ * Resolves which db path to use this session. If a custom path is configured
+ * but its drive/folder isn't currently reachable, asks the user rather than
+ * silently falling back and creating a second, diverging database.
+ */
+function resolveDbPath(config: AppConfig, defaultDbPath: string): string | null {
+  if (!config.dbPath) return defaultDbPath;
+
+  while (!fs.existsSync(path.dirname(config.dbPath))) {
+    const choice = dialog.showMessageBoxSync({
+      type: "warning",
+      title: "قاعدة البيانات غير موجودة",
+      message: "تعذّر الوصول إلى موقع قاعدة البيانات المخصَّص.",
+      detail: `تأكد من توصيل القرص الخارجي ثم أعد المحاولة.\n\nالموقع: ${config.dbPath}`,
+      buttons: ["إعادة المحاولة", "استخدام الموقع الافتراضي مؤقتاً", "إغلاق البرنامج"],
+      defaultId: 0,
+      cancelId: 2,
+    });
+    if (choice === 1) return defaultDbPath;
+    if (choice === 2) return null;
+    // choice === 0: loop and re-check
+  }
+  return config.dbPath;
+}
 
 /**
  * Spawn the Python FastAPI backend.
@@ -130,6 +265,44 @@ ipcMain.handle("dialog:open-directory", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+ipcMain.handle("db:get-path", () => currentDbPath);
+
+ipcMain.handle("db:choose-location", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openDirectory", "createDirectory"],
+    title: "اختر موقع قاعدة البيانات",
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+
+  const folder = result.filePaths[0];
+  const target = path.join(folder, "archive.db");
+
+  if (path.normalize(target) === path.normalize(currentDbPath)) {
+    return { status: "unchanged", path: target };
+  }
+
+  if (fs.existsSync(target)) {
+    return { status: "adopt", path: target };
+  }
+
+  const foundElsewhere = findExistingArchiveDb(path.parse(folder).root, target);
+  if (foundElsewhere) {
+    return { status: "conflict", path: target, foundPath: foundElsewhere };
+  }
+
+  return { status: "new", path: target };
+});
+
+ipcMain.handle("db:confirm-location", (_, targetPath: string) => {
+  const config = readConfig();
+  writeConfig({ ...config, pendingDbPath: targetPath });
+});
+
+ipcMain.handle("app:restart", () => {
+  app.relaunch();
+  app.exit();
+});
+
 ipcMain.handle("dialog:save-pdf", async () => {
   const now = new Date();
   const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -166,10 +339,21 @@ ipcMain.handle("export:pdf", async (_, { outputPath, researcher }: { outputPath:
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
-  const dbPath = path.join(app.getPath("userData"), "archive.db");
+  const defaultDbPath = path.join(app.getPath("userData"), "archive.db");
+
+  let config = readConfig();
+  config = applyPendingRelocation(config, defaultDbPath);
+
+  const resolvedDbPath = resolveDbPath(config, defaultDbPath);
+  if (resolvedDbPath === null) {
+    app.quit();
+    return;
+  }
+  const dbPath = resolvedDbPath;
+  currentDbPath = dbPath;
 
   // On first launch in production, copy the bundled seed database to userData.
-  if (!isDev && !fs.existsSync(dbPath)) {
+  if (!isDev && dbPath === defaultDbPath && !fs.existsSync(dbPath)) {
     const bundledDb = path.join(
       (process as any).resourcesPath as string,
       "archive.db"
