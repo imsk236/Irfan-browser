@@ -1,9 +1,11 @@
-"""HTTP-level tests for /trace endpoints.
+"""HTTP-level tests for the unified GET /trace search (ADR 0005).
 
-Scenario: tracing all appearances of ابن النضر across the archive, then
-exploring the مسقط wilaya to see its scholars, manuscript copies, and
-repositories. Tests verify routing, status codes, and the shape of both
-trace endpoints.
+Scenario: a small archive with two repositories, two عناوين (one with a
+تاريخ النسخ, one copied for صلالة with a ناسخ), and one مجلد matched only by
+its number with no recorded person at all. Tests verify that شخص, منطقة
+العالم, مكان النسخ, العنوان, الرقم, الخزانة, and سنة النسخ all narrow
+independently and combine correctly, and that a pure volume/work match with
+no قدير relationship still surfaces as a placeholder row.
 """
 import pytest
 from src.services import volumes as vol_svc
@@ -15,112 +17,164 @@ from src.services import relationships as rel_svc
 
 @pytest.fixture
 def scene(session):
-    """Minimal archive: one scholar linked as مؤلف to one work."""
     repo = vol_svc.create_repository(session, "5001", "خزانة التتبع")
+    other_repo = vol_svc.create_repository(session, "5002", "خزانة أخرى")
+
     vol = vol_svc.create_volume(session, repo.id)
-    work = work_svc.create_work(session, vol.id, title="رسالة في الأصول")
+    work = work_svc.create_work(session, vol.id, title="رسالة في الأصول", copy_year=1210)
     person = person_svc.create_person(session, preferred_name="ابن النضر البهلوي")
-    ann = ann_svc.create_annotation(
-        session, vol.id, "تملك", text_as_written="ملكه ابن النضر"
-    )
+    person_svc.set_wilayas(session, person.id, ["نزوى"])
+    ann = ann_svc.create_annotation(session, vol.id, "تملك", text_as_written="ملكه ابن النضر")
     rel = rel_svc.link_person_to_work(
-        session, person.id, work.id, role="مؤلف",
-        evidence_annotation_id=ann.id,
+        session, person.id, work.id, role="مؤلف", evidence_annotation_id=ann.id,
     )
+
+    copied_vol = vol_svc.create_volume(session, other_repo.id)
+    copied_work = work_svc.create_work(session, copied_vol.id, title="مقالة في الفقه", copy_place="صلالة")
+    scribe = person_svc.create_person(session, preferred_name="ناسخ الأصول")
+    scribe_rel = rel_svc.link_person_to_work(session, scribe.id, copied_work.id, role="ناسخ")
+
+    bare_vol = vol_svc.create_volume(session, repo.id, repository_volume_number=77)
+
     return {
-        "vol": vol, "work": work, "person": person,
-        "ann": ann, "rel": rel,
+        "repo": repo, "other_repo": other_repo,
+        "vol": vol, "work": work, "person": person, "ann": ann, "rel": rel,
+        "copied_vol": copied_vol, "copied_work": copied_work,
+        "scribe": scribe, "scribe_rel": scribe_rel,
+        "bare_vol": bare_vol,
     }
 
 
-# ── GET /trace/{person_id} ────────────────────────────────────────────────────
+# ── Validation ─────────────────────────────────────────────────────────────────
 
-def test_trace_person_empty_when_no_relationships(client):
-    """A person with no relationships returns an empty list."""
+def test_no_filters_returns_422(client):
+    r = client.get("/trace")
+    assert r.status_code == 422
+
+
+# ── شخص (person_id) ──────────────────────────────────────────────────────────
+
+def test_person_empty_when_no_relationships(client):
     r_p = client.post("/persons", json={"preferred_name": "شخص بلا ظهور"})
     person_id = r_p.json()["id"]
-    r = client.get(f"/trace/{person_id}")
+    r = client.get(f"/trace?person_id={person_id}")
     assert r.status_code == 200
     assert r.json() == []
 
 
-def test_trace_person_200_with_relationship(client, scene):
-    r = client.get(f"/trace/{scene['person'].id}")
+def test_person_200_with_relationship(client, scene):
+    r = client.get(f"/trace?person_id={scene['person'].id}")
     assert r.status_code == 200
     results = r.json()
     assert len(results) == 1
     item = results[0]
-    # All required TraceResultOut fields present
-    for field in [
-        "relationship_id", "role", "level", "serial",
-        "evidence_annotation_type", "evidence_source",
-    ]:
+    for field in ["relationship_id", "role", "level", "serial", "volume_id", "evidence_source"]:
         assert field in item, f"Missing field: {field}"
     assert item["role"] == "مؤلف"
     assert item["serial"] == scene["vol"].serial
-
-
-def test_trace_person_includes_evidence_text(client, scene):
-    r = client.get(f"/trace/{scene['person'].id}")
-    item = r.json()[0]
     assert item["evidence_text"] == "ملكه ابن النضر"
-    assert item["evidence_annotation_type"] == "تملك"
 
 
-def test_trace_person_results_ordered_by_role_then_serial(client, scene, session):
-    """Add a second volume-level relationship; results must stay sorted."""
+def test_person_results_ordered_by_role_then_serial(client, scene, session):
     vol2 = vol_svc.create_volume(session, scene["vol"].repository_id)
-    rel_svc.link_person_to_volume(
-        session, scene["person"].id, vol2.id, role="مالك"
-    )
-    r = client.get(f"/trace/{scene['person'].id}")
+    rel_svc.link_person_to_volume(session, scene["person"].id, vol2.id, role="مالك")
+    r = client.get(f"/trace?person_id={scene['person'].id}")
     assert r.status_code == 200
-    pairs = [(item["role"], item["serial"]) for item in r.json()]
+    results = r.json()
+    assert len(results) == 2
+    roles = {item["role"] for item in results}
+    assert roles == {"مؤلف", "مالك"}
+    levels = {item["level"] for item in results}
+    assert levels == {"work", "volume"}
+    pairs = [(item["role"], item["serial"]) for item in results]
     assert pairs == sorted(pairs)
 
 
-# ── GET /trace/wilaya ─────────────────────────────────────────────────────────
+# ── منطقة العالم (region) ────────────────────────────────────────────────────
 
-def test_trace_wilaya_200_structure(client):
-    r = client.get("/trace/wilaya?name=مسقط")
+def test_region_matches_person_wilaya(client, scene):
+    r = client.get("/trace?region=نزوى")
     assert r.status_code == 200
-    data = r.json()
-    assert "scholars" in data
-    assert "copies" in data
-    assert "repositories" in data
+    ids = [item["relationship_id"] for item in r.json()]
+    assert scene["rel"].id in ids
 
 
-def test_trace_wilaya_empty_when_no_data(client):
-    """Wilaya with no linked persons, copies, or repos returns empty arrays."""
-    r = client.get("/trace/wilaya?name=مدينة-لا-توجد-في-الأرشيف")
+def test_region_empty_when_no_match(client, scene):
+    r = client.get("/trace?region=مدينة-لا-توجد-في-الأرشيف")
     assert r.status_code == 200
-    data = r.json()
-    assert data["scholars"] == []
-    assert data["copies"] == []
-    assert data["repositories"] == []
+    assert r.json() == []
 
 
-def test_trace_wilaya_scholars_after_person_wilaya_set(client, scene, session):
-    """Scholar appears in wilaya trace after their wilaya is set."""
-    person_svc.set_wilayas(session, scene["person"].id, ["مسقط"])
-    r = client.get("/trace/wilaya?name=مسقط")
+# ── مكان النسخ (copy_place) ──────────────────────────────────────────────────
+
+def test_copy_place_matches_work(client, scene):
+    r = client.get("/trace?copy_place=صلالة")
     assert r.status_code == 200
-    scholars = r.json()["scholars"]
-    assert any(s["person_id"] == scene["person"].id for s in scholars)
-    # appearance_count must be a non-negative integer
-    for s in scholars:
-        assert isinstance(s["appearance_count"], int)
-        assert s["appearance_count"] >= 0
+    ids = [item["relationship_id"] for item in r.json()]
+    assert scene["scribe_rel"].id in ids
 
 
-def test_trace_wilaya_copies_after_work_copy_place_set(client, scene, session):
-    """Work with copy_place matching the wilaya appears in copies."""
-    from src.services import works as work_svc
-    work_svc.update_work(session, scene["work"].id, copy_place="صلالة")
-    # Link a ناسخ so the copier_name can be populated
-    scribe = person_svc.create_person(session, preferred_name="ناسخ الأصول")
-    rel_svc.link_person_to_work(session, scribe.id, scene["work"].id, role="ناسخ")
-    r = client.get("/trace/wilaya?name=صلالة")
+# ── العنوان / الرقم / الخزانة / سنة النسخ (volume/work filters, no person) ───
+
+def test_title_with_no_person_returns_placeholder_for_unlinked_match(client, scene):
+    """A pure title search with no relationship on that work still surfaces it."""
+    r = client.get("/trace?title=مقالة")
     assert r.status_code == 200
-    copies = r.json()["copies"]
-    assert any(c["work_id"] == scene["work"].id for c in copies)
+    results = r.json()
+    # copied_work has a ناسخ relationship -> real row, not a placeholder
+    assert any(item["work_id"] == scene["copied_work"].id and item["relationship_id"] is not None for item in results)
+
+
+def test_number_matches_bare_volume_as_placeholder(client, scene):
+    r = client.get("/trace?number=77")
+    assert r.status_code == 200
+    results = r.json()
+    assert len(results) == 1
+    item = results[0]
+    assert item["volume_id"] == scene["bare_vol"].id
+    assert item["relationship_id"] is None
+    assert item["role"] is None
+    assert item["work_id"] is None
+
+
+def test_repository_id_filter(client, scene):
+    r = client.get(f"/trace?repository_id={scene['other_repo'].id}")
+    assert r.status_code == 200
+    volume_ids = {item["volume_id"] for item in r.json()}
+    assert volume_ids == {scene["copied_vol"].id}
+
+
+def test_year_range_matches_work_copy_year(client, scene):
+    r = client.get("/trace?year_from=1200&year_to=1220")
+    assert r.status_code == 200
+    results = r.json()
+    assert any(item["work_id"] == scene["work"].id for item in results)
+
+
+def test_year_range_excludes_undated(client, scene):
+    r = client.get("/trace?year_from=1400&year_to=1420")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+# ── Combined filters (independent intersection) ─────────────────────────────
+
+def test_person_plus_title_narrows_to_matching_relationship(client, scene):
+    r = client.get(f"/trace?person_id={scene['person'].id}&title=رسالة")
+    assert r.status_code == 200
+    results = r.json()
+    assert len(results) == 1
+    assert results[0]["relationship_id"] == scene["rel"].id
+
+
+def test_person_plus_title_excludes_when_title_not_in_persons_volumes(client, scene):
+    r = client.get(f"/trace?person_id={scene['person'].id}&title=مقالة")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_repository_plus_region_intersect(client, scene):
+    """other_repo has no scholar from نزوى -> no rows even though region matches elsewhere."""
+    r = client.get(f"/trace?repository_id={scene['other_repo'].id}&region=نزوى")
+    assert r.status_code == 200
+    assert r.json() == []

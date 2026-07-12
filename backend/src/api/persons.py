@@ -113,9 +113,10 @@ class PersonMatchOut(BaseModel):
 
 class AppearanceOut(BaseModel):
     """Archive appearance of a person — used by the person profile screen."""
-    relationship_id: int
-    role: str
-    level: str
+    relationship_id: int | None
+    role: str | None
+    level: str | None
+    volume_id: int
     serial: str
     repository_volume_number: int | None
     work_id: int | None

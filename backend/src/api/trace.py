@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from ..db.engine import get_session
 from ..services import trace as svc
@@ -7,9 +7,10 @@ router = APIRouter(prefix="/trace", tags=["trace"])
 
 
 class TraceResultOut(BaseModel):
-    relationship_id: int
-    role: str
-    level: str
+    relationship_id: int | None
+    role: str | None
+    level: str | None
+    volume_id: int
     serial: str
     repository_volume_number: int | None
     work_id: int | None
@@ -22,50 +23,31 @@ class TraceResultOut(BaseModel):
     notes: str | None
 
 
-class WilayaScholarOut(BaseModel):
-    person_id: int
-    preferred_name: str
-    appearance_count: int
-
-
-class WilayaCopyOut(BaseModel):
-    work_id: int
-    work_title: str
-    serial: str
-    repository_volume_number: int | None
-    copier_name: str | None
-
-
-class WilayaRepositoryOut(BaseModel):
-    repository_id: int
-    name: str
-    place_key: str
-    volume_count: int
-
-
-class WilayaTraceOut(BaseModel):
-    scholars: list[WilayaScholarOut]
-    copies: list[WilayaCopyOut]
-    repositories: list[WilayaRepositoryOut]
-
-
-# /wilaya must be registered before /{person_id} so FastAPI doesn't try to
-# coerce the literal string "wilaya" as an integer person_id.
-@router.get("/wilaya", response_model=WilayaTraceOut)
-def trace_wilaya(name: str):
-    """Return scholars, copied works, and repositories associated with a wilaya."""
+@router.get("", response_model=list[TraceResultOut])
+def search(
+    person_id: int | None = None,
+    region: str | None = None,
+    copy_place: str | None = None,
+    title: str | None = None,
+    number: str | None = None,
+    repository_id: int | None = None,
+    year_from: int | None = None,
+    year_to: int | None = None,
+):
+    """Unified البحث والتتبع search — شخص/منطقة العالم/مكان النسخ/عنوان/رقم/خزانة/سنة النسخ, all optional and combinable."""
     with get_session() as session:
-        result = svc.trace_wilaya(session, name)
-        return WilayaTraceOut(
-            scholars=[WilayaScholarOut(**vars(s)) for s in result.scholars],
-            copies=[WilayaCopyOut(**vars(c)) for c in result.copies],
-            repositories=[WilayaRepositoryOut(**vars(r)) for r in result.repositories],
-        )
-
-
-@router.get("/{person_id}", response_model=list[TraceResultOut])
-def trace_scholar(person_id: int):
-    """Return all manuscript links for a scholar, sorted by role then serial."""
-    with get_session() as session:
-        results = svc.trace_scholar(session, person_id)
+        try:
+            results = svc.trace_scholar(
+                session,
+                person_id=person_id,
+                region=region,
+                copy_place=copy_place,
+                title=title,
+                number=number,
+                repository_id=repository_id,
+                year_from=year_from,
+                year_to=year_to,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
         return [TraceResultOut(**vars(r)) for r in results]
