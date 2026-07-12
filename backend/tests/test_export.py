@@ -248,3 +248,15 @@ def test_pdf_html_empty_db_returns_200_not_500(client):
     r = client.get("/export/pdf-html")
     assert r.status_code == 200
     assert "<html" in r.text.lower()
+
+
+def test_pdf_html_lists_all_scribes_not_just_last(client, session, archive):
+    """A work with multiple ناسخ must show every scribe name, not just the last one."""
+    scribe1 = person_svc.create_person(session, preferred_name="الناسخ الأول")
+    scribe2 = person_svc.create_person(session, preferred_name="الناسخ الثاني")
+    rel_svc.link_person_to_work(session, scribe1.id, archive["work"].id, role="ناسخ")
+    rel_svc.link_person_to_work(session, scribe2.id, archive["work"].id, role="ناسخ")
+
+    r = client.get("/export/pdf-html")
+    assert "الناسخ الأول" in r.text
+    assert "الناسخ الثاني" in r.text

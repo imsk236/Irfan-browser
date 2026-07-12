@@ -14,15 +14,15 @@ def test_get_role_vocab_contains_seeded_values(client):
     assert r.status_code == 200
     values = r.json()
     # Core seeded roles from seed.py
-    assert "مؤلف" in values
     assert "ناسخ" in values
+    assert "مالك" in values
     assert isinstance(values, list)
 
 
 def test_get_annotation_type_vocab(client):
     r = client.get("/vocab/annotation_type")
     assert r.status_code == 200
-    assert "تملك" in r.json()
+    assert "وقف" in r.json()
 
 
 def test_get_unknown_category_returns_empty_list(client):

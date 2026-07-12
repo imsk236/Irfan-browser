@@ -11,6 +11,7 @@ _ACTIVE_CATEGORIES = {
     "role",
     "knowledge_source",
     "annotation_type",
+    "contributor_role",
     "hijri_month",
     "weekday",
     "copy_time",
@@ -96,6 +97,30 @@ def test_person_identification_status_sort_order(engine):
         ).fetchall()
     values_in_order = [r[0] for r in rows]
     assert values_in_order == ["معروف", "غير مكتمل التعريف", "مجهول", "يحتاج إلى مراجعة"]
+
+
+def test_contributor_role_values(engine):
+    """contributor_role (المساهم) must contain all eight approved values."""
+    with engine.connect() as conn:
+        values = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT value FROM vocab "
+                    "WHERE category = 'contributor_role' AND is_active = 1"
+                )
+            ).fetchall()
+        }
+    assert values == {
+        "الراوي",
+        "المترجم",
+        "الجامع",
+        "المرتب",
+        "المعلق",
+        "المستدرك",
+        "المصحح",
+        "مؤلف مشارك",
+    }, f"Values mismatch. Got: {values}"
 
 
 def test_seed_is_idempotent(engine):

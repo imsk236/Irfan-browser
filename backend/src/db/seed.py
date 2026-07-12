@@ -1,15 +1,37 @@
 from sqlalchemy import Engine, text
 
 VOCAB_SEED = [
-    # role
-    ("role", "مؤلف", 1),
-    ("role", "ناسخ", 2),
-    ("role", "مالك", 3),
+    # role (الدور — person role within a قيد)
+    ("role", "ناسخ", 1),
+    ("role", "كاتب", 2),
+    ("role", "مُعير", 3),
     ("role", "مستعير", 4),
-    ("role", "واقف", 5),
-    ("role", "مقيّد", 6),
-    ("role", "مذكور", 7),
-    ("role", "منسوخ له", 8),
+    ("role", "مُهْدِي", 5),
+    ("role", "مُهْدَى إليه", 6),
+    ("role", "مالك", 7),
+    ("role", "شاري", 8),
+    ("role", "بائع", 9),
+    ("role", "مُطالِع", 10),
+    ("role", "مُعارض", 11),
+    ("role", "معروض عليه", 12),
+    ("role", "مُقابِل", 13),
+    ("role", "ناظر", 14),
+    ("role", "واهب", 15),
+    ("role", "موهوب", 16),
+    ("role", "واقف", 17),
+    ("role", "موقوف", 18),
+    ("role", "ناظر الوقف", 19),
+    ("role", "دلال", 20),
+    ("role", "شاهد", 21),
+    # contributor_role (المساهم) — work-level only, distinct taxonomy from `role`
+    ("contributor_role", "الراوي", 1),
+    ("contributor_role", "المترجم", 2),
+    ("contributor_role", "الجامع", 3),
+    ("contributor_role", "المرتب", 4),
+    ("contributor_role", "المعلق", 5),
+    ("contributor_role", "المستدرك", 6),
+    ("contributor_role", "المصحح", 7),
+    ("contributor_role", "مؤلف مشارك", 8),
     # confidence
     ("confidence", "مؤكد", 1),
     ("confidence", "مرجح", 2),
@@ -18,12 +40,18 @@ VOCAB_SEED = [
     ("knowledge_source", "المجلد", 1),
     ("knowledge_source", "مصدر خارجي", 2),
     ("knowledge_source", "المفهرس", 3),
-    # annotation_type
-    ("annotation_type", "تملك", 1),
-    ("annotation_type", "وقف", 2),
-    ("annotation_type", "إهداء", 3),
-    ("annotation_type", "ولادة", 4),
-    ("annotation_type", "وفاة", 5),
+    # annotation_type (نوع القيد)
+    ("annotation_type", "إعارة", 1),
+    ("annotation_type", "إهداء", 2),
+    ("annotation_type", "تملُّك", 3),
+    ("annotation_type", "سماع", 4),
+    ("annotation_type", "شراء", 5),
+    ("annotation_type", "مطالعة", 6),
+    ("annotation_type", "معارضة", 7),
+    ("annotation_type", "مقابلة", 8),
+    ("annotation_type", "نظر", 9),
+    ("annotation_type", "هِبَة", 10),
+    ("annotation_type", "وقف", 11),
     # hijri_month (fixed 12 months)
     ("hijri_month", "محرم", 1),
     ("hijri_month", "صفر", 2),
@@ -128,8 +156,14 @@ DEACTIVATED_CATEGORIES = {"repository_kind", "work_type", "date_precision", "evi
 
 def seed_vocab(engine: Engine) -> None:
     with engine.connect() as conn:
-        # Wilaya list is canonical — delete and re-insert to fix stale/wrong entries
-        conn.execute(text("DELETE FROM vocab WHERE category = 'wilaya'"))
+        # Every category in VOCAB_SEED is canonical: delete and re-insert on
+        # every startup so edits made here (renames, reorders, removals) reach
+        # already-installed client databases, not just fresh ones. Safe because
+        # nothing in the app writes to `vocab` outside of this function — the
+        # add/deactivate endpoints exist but no UI calls them (ADR 0002).
+        seeded_categories = {category for category, _, _ in VOCAB_SEED}
+        for category in seeded_categories:
+            conn.execute(text("DELETE FROM vocab WHERE category = :category"), {"category": category})
 
         for category, value, sort_order in VOCAB_SEED:
             conn.execute(

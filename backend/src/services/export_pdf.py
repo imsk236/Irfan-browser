@@ -74,10 +74,10 @@ def export_pdf_html(researcher_name: str = "") -> str:
     for w in works:
         works_by_vol.setdefault(w["volume_id"], []).append(w)
 
-    copyist_by_work: dict[int, str] = {}
+    copyist_by_work: dict[int, list[str]] = {}
     for rel in rels:
         if rel["role"] == "ناسخ" and rel["work_id"]:
-            copyist_by_work[rel["work_id"]] = rel["preferred_name"]
+            copyist_by_work.setdefault(rel["work_id"], []).append(rel["preferred_name"])
 
     persons_by_vol: dict[int, list] = {}
     for rel in rels:
@@ -127,9 +127,9 @@ def _volume_card(vol, works, persons, copyist_by_work: dict) -> str:
             details.append(f"النسخ: {_e(w['copy_year'])}")
         if w["copy_place"]:
             details.append(f"المكان: {_e(w['copy_place'])}")
-        copyist = copyist_by_work.get(w["id"])
-        if copyist:
-            details.append(f"الناسخ: {_e(copyist)}")
+        copyists = copyist_by_work.get(w["id"])
+        if copyists:
+            details.append(f"الناسخ: {_e('، '.join(copyists))}")
 
         detail_html = f'<div class="work-details">{" &nbsp;·&nbsp; ".join(details)}</div>' if details else ""
 
