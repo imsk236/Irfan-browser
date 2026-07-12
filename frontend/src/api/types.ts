@@ -21,6 +21,7 @@ export interface Work {
   volume_id: number;
   title: string;
   title_source: string | null;
+  part_number: number | null;
   incipit: string | null;
   explicit: string | null;
   topic_category: string | null;
@@ -104,9 +105,11 @@ export interface Relationship {
 }
 
 export interface TraceResult {
-  relationship_id: number;
-  role: string;
-  level: string;
+  /** Null for a placeholder row — a match with no relationship satisfying the (possibly absent) person criteria. */
+  relationship_id: number | null;
+  role: string | null;
+  level: string | null;
+  volume_id: number;
   serial: string;
   repository_volume_number: number | null;
   work_id: number | null;
@@ -179,40 +182,12 @@ export interface RepositoryCount {
   volume_count: number;
 }
 
-// ── Wilaya trace types ────────────────────────────────────────────────────────
-
-export interface WilayaScholar {
-  person_id: number;
-  preferred_name: string;
-  appearance_count: number;
-}
-
-export interface WilayaCopy {
-  work_id: number;
-  work_title: string;
-  serial: string;
-  repository_volume_number: number | null;
-  copier_name: string | null;
-}
-
-export interface WilayaRepository {
-  repository_id: number;
-  name: string;
-  place_key: string;
-  volume_count: number;
-}
-
-export interface WilayaTraceResult {
-  scholars: WilayaScholar[];
-  copies: WilayaCopy[];
-  repositories: WilayaRepository[];
-}
-
 /** Returned by GET /persons/{id}/appearances */
 export interface Appearance {
-  relationship_id: number;
-  role: string;
-  level: string;
+  relationship_id: number | null;
+  role: string | null;
+  level: string | null;
+  volume_id: number;
   serial: string;
   repository_volume_number: number | null;
   work_id: number | null;

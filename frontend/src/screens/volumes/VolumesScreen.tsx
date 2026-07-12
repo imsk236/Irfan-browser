@@ -4,9 +4,17 @@ import type { Annotation, Person, Relationship, Repository, Volume, Work } from 
 import { AnnotationDetailModal } from "../../components/AnnotationDetailModal";
 import { AnnotationFormModal } from "../../components/AnnotationFormModal";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { ErrorModal } from "../../components/ErrorModal";
 import { WorkDetailModal } from "../../components/WorkDetailModal";
 import { WorkFormModal } from "../../components/WorkFormModal";
+import { isContributorRole } from "../../utils/workRoles";
 import { VolumeForm } from "./VolumeForm";
+
+const WORK_ROLE_LABELS: Record<string, string> = {
+  "مؤلف": "المؤلف",
+  "ناسخ": "الناسخ",
+  "منسوخ له": "منسوخ له",
+};
 
 interface ConfirmState {
   title: string;
@@ -15,7 +23,13 @@ interface ConfirmState {
   onConfirm: () => void;
 }
 
-export function VolumesScreen() {
+interface Props {
+  /** A volume to open automatically (e.g. arriving from بحث عن مجلد on التتبع). */
+  pendingVolumeId?: number | null;
+  onPendingVolumeConsumed?: () => void;
+}
+
+export function VolumesScreen({ pendingVolumeId, onPendingVolumeConsumed }: Props = {}) {
   const [volumes, setVolumes] = useState<Volume[]>([]);
   const [repos, setRepos] = useState<Repository[]>([]);
   const [persons, setPersons] = useState<Person[]>([]);
@@ -44,6 +58,9 @@ export function VolumesScreen() {
   // Confirm modal
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
+  // Delete error
+  const [deleteError, setDeleteError] = useState("");
+
   const personMap = new Map(persons.map((p) => [p.id, p.preferred_name]));
 
   const filteredVolumes = volumes.filter((v) => {
@@ -67,6 +84,16 @@ export function VolumesScreen() {
       setPersons(ppl);
     }).catch((err) => setLoadError(String(err)));
   }, []);
+
+  useEffect(() => {
+    if (pendingVolumeId == null) return;
+    const vol = volumes.find((v) => v.id === pendingVolumeId);
+    if (vol) {
+      void selectVolume(vol);
+      onPendingVolumeConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingVolumeId, volumes]);
 
   async function selectVolume(v: Volume) {
     setSelected(v);
@@ -141,11 +168,15 @@ export function VolumesScreen() {
   async function deleteWork(work: Work) {
     askConfirm(
       "حذف العنوان",
-      `هل تريد حذف «${work.title}»؟ سيؤدي ذلك إلى حذف العلاقات المرتبطة به.`,
+      `هل تريد حذف «${work.title}»؟ لن يمكن حذف العنوان إذا كان مرتبطاً بقيود أو أشخاص — أزل الروابط أولاً.`,
       async () => {
         dismissConfirm();
-        await worksApi.delete(work.id);
-        await refreshVolume();
+        try {
+          await worksApi.delete(work.id);
+          await refreshVolume();
+        } catch (err) {
+          setDeleteError(String(err));
+        }
       },
       true
     );
@@ -157,14 +188,18 @@ export function VolumesScreen() {
       "هل تريد حذف هذا القيد؟",
       async () => {
         dismissConfirm();
-        await annotationsApi.delete(a.id);
-        if (selected) {
-          const [ann, rels] = await Promise.all([
-            annotationsApi.listForVolume(selected.id),
-            relationshipsApi.listForVolume(selected.id),
-          ]);
-          setAnnotations(ann);
-          setRelationships(rels);
+        try {
+          await annotationsApi.delete(a.id);
+          if (selected) {
+            const [ann, rels] = await Promise.all([
+              annotationsApi.listForVolume(selected.id),
+              relationshipsApi.listForVolume(selected.id),
+            ]);
+            setAnnotations(ann);
+            setRelationships(rels);
+          }
+        } catch (err) {
+          setDeleteError(String(err));
         }
       },
       true
@@ -178,12 +213,16 @@ export function VolumesScreen() {
       `هل تريد حذف المجلد «${selected.serial}»؟`,
       async () => {
         dismissConfirm();
-        await volumesApi.delete(selected.id);
-        setSelected(null);
-        setWorks([]);
-        setAnnotations([]);
-        setRelationships([]);
-        setVolumes(await volumesApi.list());
+        try {
+          await volumesApi.delete(selected.id);
+          setSelected(null);
+          setWorks([]);
+          setAnnotations([]);
+          setRelationships([]);
+          setVolumes(await volumesApi.list());
+        } catch (err) {
+          setDeleteError(String(err));
+        }
       },
       true
     );
@@ -195,8 +234,41 @@ export function VolumesScreen() {
       "هل تريد إزالة هذا الارتباط؟",
       async () => {
         dismissConfirm();
-        await relationshipsApi.delete(r.id);
-        if (selected) setRelationships(await relationshipsApi.listForVolume(selected.id));
+        try {
+          await relationshipsApi.delete(r.id);
+          if (selected) setRelationships(await relationshipsApi.listForVolume(selected.id));
+        } catch (err) {
+          setDeleteError(String(err));
+        }
+      },
+      true
+    );
+  }
+
+  async function removeWorkRelationship(r: Relationship) {
+    const roleLabel = WORK_ROLE_LABELS[r.role] ?? r.role;
+    const person = personMap.get(r.person_id) ?? `#${r.person_id}`;
+    // "سيصبح X مجهولاً" only holds when this is the work's sole مؤلف/ناسخ/منسوخ له —
+    // once ناسخ can be a list or the role is المساهم, removing one row doesn't
+    // make the work's scribe/contributor "unknown", it just drops that one credit.
+    const otherScribesOnWork = workRelationships.filter(
+      (other) => other.id !== r.id && other.work_id === r.work_id && other.role === "ناسخ"
+    ).length;
+    const simpleRemoval = isContributorRole(r.role) || (r.role === "ناسخ" && otherScribesOnWork > 0);
+    const message = simpleRemoval
+      ? `هل تريد إزالة «${person}» كـ${roleLabel} لهذا العنوان؟`
+      : `هل تريد إزالة «${person}» كـ${roleLabel} لهذا العنوان؟ سيصبح ${roleLabel} مجهولاً.`;
+    askConfirm(
+      "إزالة الرابط",
+      message,
+      async () => {
+        dismissConfirm();
+        try {
+          await relationshipsApi.delete(r.id);
+          if (selected) setRelationships(await relationshipsApi.listForVolume(selected.id));
+        } catch (err) {
+          setDeleteError(String(err));
+        }
       },
       true
     );
@@ -542,6 +614,7 @@ export function VolumesScreen() {
                     setViewingWork(null);
                   }}
                   onClose={() => setViewingWork(null)}
+                  onRemoveRelationship={removeWorkRelationship}
                 />
               )}
 
@@ -783,6 +856,11 @@ export function VolumesScreen() {
           onConfirm={confirmState.onConfirm}
           onCancel={dismissConfirm}
         />
+      )}
+
+      {/* Delete error */}
+      {deleteError && (
+        <ErrorModal title="تعذّر الحذف" message={deleteError} onClose={() => setDeleteError("")} />
       )}
     </div>
   );

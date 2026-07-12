@@ -14,6 +14,8 @@ interface Props {
 interface OrOtherProps extends Props {
   /** Vocab values to hide from the dropdown (e.g. work-level-only roles). */
   exclude?: string[];
+  /** Placeholder for the free-text input shown after choosing "غير ذلك". */
+  otherPlaceholder?: string;
 }
 
 export function VocabSelect({ category, value, onChange, placeholder, required, disabled, id }: Props) {
@@ -65,7 +67,7 @@ const OTHER_SENTINEL = "__other__";
  * input. The typed value is NOT added to the vocab table — see
  * docs/adr/0002-annotation-type-role-free-text-other.md.
  */
-export function VocabSelectOrOther({ category, value, onChange, placeholder, required, disabled, id, exclude }: OrOtherProps) {
+export function VocabSelectOrOther({ category, value, onChange, placeholder, required, disabled, id, exclude, otherPlaceholder }: OrOtherProps) {
   const [options, setOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [otherMode, setOtherMode] = useState(false);
@@ -105,14 +107,14 @@ export function VocabSelectOrOther({ category, value, onChange, placeholder, req
 
   if (otherMode) {
     return (
-      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
         <input
           id={id}
           className="input"
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="اكتب القيمة…"
+          placeholder={otherPlaceholder ?? "اكتب القيمة…"}
           required={required}
           disabled={disabled}
           style={{ flex: 1 }}

@@ -147,15 +147,15 @@ describe("exportApi.json", () => {
 
 // ── traceApi ─────────────────────────────────────────────────────────────────
 
-describe("traceApi.traceWilaya", () => {
-  it("calls GET /trace/wilaya with encoded wilaya name", async () => {
-    const fakeResult = { scholars: [], copies: [], repositories: [] };
+describe("traceApi.search", () => {
+  it("calls GET /trace with only the provided filters as query params", async () => {
+    const fakeResult: unknown[] = [];
     global.fetch = mockFetch(200, fakeResult);
 
-    await traceApi.traceWilaya("مسقط");
+    await traceApi.search({ region: "مسقط", year_from: 1200 });
 
     expect(fetch).toHaveBeenCalledWith(
-      `${BASE}/trace/wilaya?name=${encodeURIComponent("مسقط")}`,
+      `${BASE}/trace?region=${encodeURIComponent("مسقط")}&year_from=1200`,
       expect.objectContaining({ method: "GET" })
     );
   });

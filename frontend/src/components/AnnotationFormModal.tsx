@@ -7,9 +7,11 @@ import { PersonFormModal } from "./PersonFormModal";
 import { FolioInput } from "./FolioInput";
 import { ErrorModal } from "./ErrorModal";
 
-// مؤلف/ناسخ/منسوخ له are assigned only via WorkForm's dedicated slots — never
-// through a قيد (see CONTEXT.md's قيد entry).
-const WORK_LEVEL_ROLES = ["مؤلف", "ناسخ", "منسوخ له"];
+// مؤلف/منسوخ له are assigned only via WorkForm's dedicated slots — never
+// through a قيد (see CONTEXT.md's قيد entry). ناسخ is allowed here too, since
+// a later inscription can separately name a copyist (distinct from the
+// work-level ناسخ assignment).
+const WORK_LEVEL_ROLES = ["مؤلف", "منسوخ له"];
 
 interface SelectedPerson {
   person_id: number;
@@ -111,7 +113,7 @@ export function AnnotationFormModal({
   const [pendingPersons, setPendingPersons] = useState<PendingPerson[]>([]);
 
   const [stagePerson, setStagePerson] = useState<SelectedPerson | null>(null);
-  const [stageRole, setStageRole] = useState("مذكور");
+  const [stageRole, setStageRole] = useState("");
   // Bumped after each successful add to remount PersonField — it keeps its own
   // internal search text, which otherwise keeps showing the just-added name
   // even though stagePerson has been cleared (looks selected, isn't).
@@ -146,10 +148,10 @@ export function AnnotationFormModal({
     : false;
 
   function addStagedPerson() {
-    if (!stagePerson || isStagedDuplicate) return;
+    if (!stagePerson || !stageRole.trim() || isStagedDuplicate) return;
     setPendingPersons([...pendingPersons, { person: stagePerson, role: stageRole }]);
     setStagePerson(null);
-    setStageRole("مذكور");
+    setStageRole("");
     setPersonFieldKey((k) => k + 1);
   }
 
@@ -195,6 +197,10 @@ export function AnnotationFormModal({
         setError("التاريخ يجب أن يكون بين 1 و 30");
         return;
       }
+    }
+    if (stagePerson && !stageRole.trim()) {
+      setError("يجب اختيار دور للشخص المضاف");
+      return;
     }
     // Include any person staged in the input but not yet added via the إضافة button
     const effectivePending = (() => {
@@ -412,12 +418,19 @@ export function AnnotationFormModal({
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>الدور</label>
-                <VocabSelectOrOther category="role" value={stageRole} onChange={setStageRole} exclude={WORK_LEVEL_ROLES} />
+                <VocabSelectOrOther
+                  category="role"
+                  value={stageRole}
+                  onChange={setStageRole}
+                  exclude={WORK_LEVEL_ROLES}
+                  placeholder="اختر الدور…"
+                  otherPlaceholder="اكتب دور الشخص أو علاقته بهذا القيد…"
+                />
               </div>
               <button
                 type="button"
                 className="btn btn-secondary btn-compact"
-                disabled={!stagePerson || isStagedDuplicate}
+                disabled={!stagePerson || !stageRole.trim() || isStagedDuplicate}
                 title={isStagedDuplicate ? "هذا الشخص مضاف بالفعل بهذا الدور" : undefined}
                 onClick={addStagedPerson}
                 style={{ marginBottom: 0 }}

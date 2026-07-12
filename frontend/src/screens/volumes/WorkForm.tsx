@@ -5,9 +5,10 @@ import { VocabSelect } from "../../components/VocabSelect";
 import { PersonField } from "../../components/PersonField";
 import { PersonFormModal } from "../../components/PersonFormModal";
 import { FolioInput } from "../../components/FolioInput";
+import { PersonRoleSection, PersonRoleListSection } from "../../components/PersonRoleSection";
+import type { PersonRoleListRow } from "../../components/PersonRoleSection";
+import { SOURCE_SENTINELS, isContributorRole } from "../../utils/workRoles";
 import type { Person, Relationship, Work } from "../../api/types";
-
-const SOURCE_SENTINELS = ["المخطوط", "المفهرس"] as const;
 
 const TOPIC_TAXONOMY: Record<string, string[]> = {
   "القرآن وعلومه": ["المصاحف", "أصول التفسير", "التفسير", "القراءات", "التجويد", "غريب القرآن", "إعراب القرآن", "رسم المصاحف"],
@@ -46,148 +47,9 @@ interface Props {
   onCancel: () => void;
 }
 
-function PersonRoleSection({
-  roleLabel,
-  required,
-  existingName,
-  replacing,
-  onReplace,
-  onCancelReplace,
-  person,
-  onPersonChange,
-  unknown,
-  onUnknownChange,
-  source,
-  onSourceChange,
-  showCustom,
-  onShowCustomChange,
-  onRequestCreate,
-  work,
-}: {
-  roleLabel: string;
-  required: boolean;
-  existingName: string | null;
-  replacing: boolean;
-  onReplace: () => void;
-  onCancelReplace: () => void;
-  person: SelectedPerson | null;
-  onPersonChange: (p: SelectedPerson | null) => void;
-  unknown: boolean;
-  onUnknownChange: (v: boolean) => void;
-  source: string;
-  onSourceChange: (v: string) => void;
-  showCustom: boolean;
-  onShowCustomChange: (v: boolean) => void;
-  onRequestCreate: (name: string) => void;
-  work: Work | null;
-}) {
-  const selectedOption = SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number])
-    ? source
-    : showCustom ? "مرجع آخر" : null;
-
-  return (
-    <div
-      style={{
-        marginBottom: "var(--space-4)",
-        padding: "var(--space-3)",
-        background: "var(--color-surface-muted)",
-        borderRadius: "var(--radius)",
-        border: "1px solid var(--color-border)",
-      }}
-    >
-      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: "var(--space-2)" }}>
-        {roleLabel} {required && <span style={{ color: "var(--color-error)" }}>*</span>}
-      </div>
-
-      {existingName && !replacing ? (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 14 }}>{existingName}</span>
-          <button type="button" className="btn btn-secondary btn-compact" onClick={onReplace}>
-            تغيير
-          </button>
-        </div>
-      ) : (
-        <>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: "var(--space-2)", cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={unknown}
-              onChange={(e) => {
-                onUnknownChange(e.target.checked);
-                if (e.target.checked) onPersonChange(null);
-              }}
-            />
-            مجهول
-          </label>
-
-          {!unknown && (
-            <PersonField
-              label={`من ${roleLabel}؟`}
-              value={person}
-              onChange={onPersonChange}
-              saveVariant
-              onRequestCreate={onRequestCreate}
-            />
-          )}
-
-          {!unknown && person && (
-            <div className="field" style={{ marginTop: "var(--space-3)" }}>
-              <label style={{ fontSize: 12, color: "var(--color-text-muted)" }}>مصدر الصلة</label>
-              <div style={{ display: "flex", gap: "var(--space-5)", marginTop: "var(--space-1)" }}>
-                {(["المخطوط", "المفهرس", "مرجع آخر"] as const).map((opt) => (
-                  <label key={opt} style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", fontSize: 13, cursor: "pointer" }}>
-                    <input
-                      type="radio"
-                      name={`source-${roleLabel}`}
-                      checked={selectedOption === opt}
-                      onChange={() => {
-                        if (opt === "مرجع آخر") {
-                          onShowCustomChange(true);
-                          if (SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number])) {
-                            onSourceChange("");
-                          }
-                        } else {
-                          onShowCustomChange(false);
-                          onSourceChange(opt);
-                        }
-                      }}
-                    />
-                    {opt}
-                  </label>
-                ))}
-              </div>
-              {showCustom && (
-                <input
-                  className="input"
-                  type="text"
-                  placeholder="اذكر المرجع…"
-                  value={SOURCE_SENTINELS.includes(source as typeof SOURCE_SENTINELS[number]) ? "" : source}
-                  onChange={(e) => onSourceChange(e.target.value)}
-                  style={{ marginTop: "var(--space-2)" }}
-                  autoFocus
-                />
-              )}
-            </div>
-          )}
-
-          {work && replacing && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-compact"
-              style={{ marginTop: "var(--space-2)" }}
-              onClick={onCancelReplace}
-            >
-              إلغاء التغيير
-            </button>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
 export function WorkForm({ volumeId, work, relationships, personMap, folioCount, onSaved, onCancel }: Props) {
   const [title, setTitle] = useState(work?.title ?? "");
+  const [partNumber, setPartNumber] = useState(work?.part_number?.toString() ?? "");
   const [titleSource, setTitleSource] = useState(work?.title_source ?? "");
   const [titleCustom, setTitleCustom] = useState(
     !!work?.title_source && !SOURCE_SENTINELS.includes(work.title_source as typeof SOURCE_SENTINELS[number])
@@ -223,15 +85,29 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
   const [authorSource, setAuthorSource] = useState("");
   const [authorCustom, setAuthorCustom] = useState(false);
 
-  // Scribe (ناسخ)
-  const existingScribeRel = work && relationships
-    ? relationships.find((r) => r.work_id === work.id && r.role === "ناسخ") ?? null
-    : null;
-  const [replaceScribe, setReplaceScribe] = useState(false);
-  const [scribe, setScribe] = useState<SelectedPerson | null>(null);
+  // Scribes (ناسخ — one or more, required)
+  const existingScribeRels = work && relationships
+    ? relationships.filter((r) => r.work_id === work.id && r.role === "ناسخ")
+    : [];
+  const [removedScribeRelIds, setRemovedScribeRelIds] = useState<number[]>([]);
+  const [pendingScribes, setPendingScribes] = useState<{ person: SelectedPerson; source: string }[]>([]);
   const [scribeUnknown, setScribeUnknown] = useState(false);
-  const [scribeSource, setScribeSource] = useState("");
-  const [scribeCustom, setScribeCustom] = useState(false);
+  const [stageScribePerson, setStageScribePerson] = useState<SelectedPerson | null>(null);
+  const [stageScribeSource, setStageScribeSource] = useState("");
+  const [stageScribeCustom, setStageScribeCustom] = useState(false);
+  const [scribePersonFieldKey, setScribePersonFieldKey] = useState(0);
+
+  // Contributors (المساهم — zero or more, optional)
+  const existingContributorRels = work && relationships
+    ? relationships.filter((r) => r.work_id === work.id && isContributorRole(r.role))
+    : [];
+  const [removedContributorRelIds, setRemovedContributorRelIds] = useState<number[]>([]);
+  const [pendingContributors, setPendingContributors] = useState<{ person: SelectedPerson; role: string; source: string }[]>([]);
+  const [stageContributorPerson, setStageContributorPerson] = useState<SelectedPerson | null>(null);
+  const [stageContributorRole, setStageContributorRole] = useState("");
+  const [stageContributorSource, setStageContributorSource] = useState("");
+  const [stageContributorCustom, setStageContributorCustom] = useState(false);
+  const [contributorPersonFieldKey, setContributorPersonFieldKey] = useState(0);
 
   // Copied for (منسوخ له — optional)
   const existingCopiedForRel = work && relationships
@@ -245,8 +121,77 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const [personModalSlot, setPersonModalSlot] = useState<"author" | "scribe" | "copiedFor" | null>(null);
+  const [personModalSlot, setPersonModalSlot] = useState<"author" | "copiedFor" | "scribeStage" | "contributorStage" | null>(null);
   const [personModalName, setPersonModalName] = useState("");
+
+  const scribeRows: PersonRoleListRow[] = [
+    ...existingScribeRels
+      .filter((r) => !removedScribeRelIds.includes(r.id))
+      .map((r) => ({
+        key: `existing-${r.id}`,
+        relationshipId: r.id,
+        person: { person_id: r.person_id, preferred_name: personMap?.get(r.person_id) ?? `شخص #${r.person_id}`, written_form: "" },
+        role: "ناسخ",
+        source: r.evidence_source ?? "",
+        onRemove: () => setRemovedScribeRelIds((prev) => [...prev, r.id]),
+      })),
+    ...pendingScribes.map((p, idx) => ({
+      key: `pending-${idx}`,
+      relationshipId: null,
+      person: p.person,
+      role: "ناسخ",
+      source: p.source,
+      onRemove: () => setPendingScribes((prev) => prev.filter((_, i) => i !== idx)),
+    })),
+  ];
+
+  const isStagedScribeDuplicate = stageScribePerson
+    ? scribeRows.some((r) => r.person.person_id === stageScribePerson.person_id)
+    : false;
+
+  function addStagedScribe() {
+    if (!stageScribePerson || isStagedScribeDuplicate) return;
+    setPendingScribes((prev) => [...prev, { person: stageScribePerson, source: stageScribeSource }]);
+    setStageScribePerson(null);
+    setStageScribeSource("");
+    setStageScribeCustom(false);
+    setScribePersonFieldKey((k) => k + 1);
+  }
+
+  const contributorRows: PersonRoleListRow[] = [
+    ...existingContributorRels
+      .filter((r) => !removedContributorRelIds.includes(r.id))
+      .map((r) => ({
+        key: `existing-${r.id}`,
+        relationshipId: r.id,
+        person: { person_id: r.person_id, preferred_name: personMap?.get(r.person_id) ?? `شخص #${r.person_id}`, written_form: "" },
+        role: r.role,
+        source: r.evidence_source ?? "",
+        onRemove: () => setRemovedContributorRelIds((prev) => [...prev, r.id]),
+      })),
+    ...pendingContributors.map((p, idx) => ({
+      key: `pending-${idx}`,
+      relationshipId: null,
+      person: p.person,
+      role: p.role,
+      source: p.source,
+      onRemove: () => setPendingContributors((prev) => prev.filter((_, i) => i !== idx)),
+    })),
+  ];
+
+  const isStagedContributorDuplicate = stageContributorPerson && stageContributorRole
+    ? contributorRows.some((r) => r.person.person_id === stageContributorPerson.person_id && r.role === stageContributorRole)
+    : false;
+
+  function addStagedContributor() {
+    if (!stageContributorPerson || !stageContributorRole || isStagedContributorDuplicate) return;
+    setPendingContributors((prev) => [...prev, { person: stageContributorPerson, role: stageContributorRole, source: stageContributorSource }]);
+    setStageContributorPerson(null);
+    setStageContributorRole("");
+    setStageContributorSource("");
+    setStageContributorCustom(false);
+    setContributorPersonFieldKey((k) => k + 1);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -255,6 +200,13 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
     if (!title.trim()) {
       setError("العنوان مطلوب");
       return;
+    }
+    if (partNumber) {
+      const p = parseInt(partNumber);
+      if (isNaN(p) || p < 1) {
+        setError("رقم الجزء يجب أن يكون رقماً صحيحاً أكبر من صفر");
+        return;
+      }
     }
 
     // Copy date coherence: day requires month, month requires year
@@ -288,12 +240,11 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         return;
       }
     }
-    // Validate ناسخ: must pick a person OR check مجهول
-    if (!work || replaceScribe) {
-      if (!scribe && !scribeUnknown) {
-        setError("الناسخ مطلوب. اختر شخصاً أو أشر إلى أنه مجهول.");
-        return;
-      }
+    // Validate ناسخ: at least one scribe (existing, pending, or staged) OR مجهول
+    const effectiveScribeCount = scribeRows.length + (stageScribePerson && !isStagedScribeDuplicate ? 1 : 0);
+    if (effectiveScribeCount === 0 && !scribeUnknown) {
+      setError("الناسخ مطلوب. أضف ناسخاً واحداً على الأقل أو أشر إلى أنه مجهول.");
+      return;
     }
 
     // Validate folio ordering: 1ي < 1س < 2ي < 2س …
@@ -328,6 +279,7 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
       let savedWork: Work;
       const workPayload = {
         title,
+        part_number: partNumber ? parseInt(partNumber) : undefined,
         title_source: titleSource || undefined,
         incipit: incipit || undefined,
         explicit: explicit || undefined,
@@ -370,24 +322,44 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         }
       }
 
-      // Handle ناسخ
-      const shouldSaveScribe = !existingScribeRel || replaceScribe;
-      if (shouldSaveScribe) {
-        if (existingScribeRel) {
-          await relationshipsApi.delete(existingScribeRel.id);
-        }
-        if (scribe && !scribeUnknown) {
-          await relationshipsApi.create({
-            person_id: scribe.person_id,
-            level: "work",
-            work_id: savedWork.id,
-            volume_id: null,
-            role: "ناسخ",
-            evidence_source: scribeSource || null,
-            evidence_annotation_id: null,
-            notes: null,
-          });
-        }
+      // Handle ناسخ (list) — include anything still sitting in the stage inputs
+      const effectivePendingScribes = stageScribePerson && !isStagedScribeDuplicate
+        ? [...pendingScribes, { person: stageScribePerson, source: stageScribeSource }]
+        : pendingScribes;
+      for (const relId of removedScribeRelIds) {
+        await relationshipsApi.delete(relId);
+      }
+      for (const p of effectivePendingScribes) {
+        await relationshipsApi.create({
+          person_id: p.person.person_id,
+          level: "work",
+          work_id: savedWork.id,
+          volume_id: null,
+          role: "ناسخ",
+          evidence_source: p.source || null,
+          evidence_annotation_id: null,
+          notes: null,
+        });
+      }
+
+      // Handle المساهم (list, optional) — include anything still sitting in the stage inputs
+      const effectivePendingContributors = stageContributorPerson && stageContributorRole && !isStagedContributorDuplicate
+        ? [...pendingContributors, { person: stageContributorPerson, role: stageContributorRole, source: stageContributorSource }]
+        : pendingContributors;
+      for (const relId of removedContributorRelIds) {
+        await relationshipsApi.delete(relId);
+      }
+      for (const p of effectivePendingContributors) {
+        await relationshipsApi.create({
+          person_id: p.person.person_id,
+          level: "work",
+          work_id: savedWork.id,
+          volume_id: null,
+          role: p.role,
+          evidence_source: p.source || null,
+          evidence_annotation_id: null,
+          notes: null,
+        });
       }
 
       // Handle منسوخ له (optional)
@@ -420,9 +392,6 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
 
   const existingAuthorName = existingAuthorRel
     ? (personMap?.get(existingAuthorRel.person_id) ?? `شخص #${existingAuthorRel.person_id}`)
-    : null;
-  const existingScribeName = existingScribeRel
-    ? (personMap?.get(existingScribeRel.person_id) ?? `شخص #${existingScribeRel.person_id}`)
     : null;
   const existingCopiedForName = existingCopiedForRel
     ? (personMap?.get(existingCopiedForRel.person_id) ?? `شخص #${existingCopiedForRel.person_id}`)
@@ -492,6 +461,18 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
               )}
             </div>
           )}
+        </div>
+
+        <div className="field" style={{ gridColumn: "1 / -1" }}>
+          <label>رقم الجزء</label>
+          <input
+            className="input"
+            type="number"
+            min="1"
+            value={partNumber}
+            onChange={(e) => setPartNumber(e.target.value)}
+            style={{ maxWidth: 160 }}
+          />
         </div>
 
         {/* المطلع — witness field: muted label, secondary visual weight */}
@@ -594,24 +575,47 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         work={work}
       />
 
-      {/* الناسخ */}
-      <PersonRoleSection
-        roleLabel="الناسخ"
+      {/* الناسخ (يمكن إضافة أكثر من واحد) */}
+      <PersonRoleListSection
+        sectionLabel="الناسخ"
         required
-        existingName={existingScribeName}
-        replacing={replaceScribe}
-        onReplace={() => setReplaceScribe(true)}
-        onCancelReplace={() => { setReplaceScribe(false); setScribe(null); setScribeUnknown(false); }}
-        person={scribe}
-        onPersonChange={setScribe}
-        unknown={scribeUnknown}
-        onUnknownChange={setScribeUnknown}
-        source={scribeSource}
-        onSourceChange={setScribeSource}
-        showCustom={scribeCustom}
-        onShowCustomChange={setScribeCustom}
-        onRequestCreate={(name) => { setPersonModalSlot("scribe"); setPersonModalName(name); }}
-        work={work}
+        rows={scribeRows}
+        stagePerson={stageScribePerson}
+        onStagePersonChange={setStageScribePerson}
+        fixedRole="ناسخ"
+        stageRole="ناسخ"
+        onStageRoleChange={() => {}}
+        stageSource={stageScribeSource}
+        onStageSourceChange={setStageScribeSource}
+        stageShowCustomSource={stageScribeCustom}
+        onStageShowCustomSourceChange={setStageScribeCustom}
+        personFieldKey={scribePersonFieldKey}
+        onAdd={addStagedScribe}
+        addDisabled={!stageScribePerson || isStagedScribeDuplicate}
+        addDisabledReason={isStagedScribeDuplicate ? "هذا الشخص مضاف بالفعل كناسخ" : undefined}
+        onRequestCreatePerson={(name) => { setPersonModalSlot("scribeStage"); setPersonModalName(name); }}
+        unknownOption={scribeRows.length === 0 ? { checked: scribeUnknown, onChange: setScribeUnknown } : undefined}
+      />
+
+      {/* المساهم */}
+      <PersonRoleListSection
+        sectionLabel="المساهم"
+        required={false}
+        rows={contributorRows}
+        stagePerson={stageContributorPerson}
+        onStagePersonChange={setStageContributorPerson}
+        roleVocabCategory="contributor_role"
+        stageRole={stageContributorRole}
+        onStageRoleChange={setStageContributorRole}
+        stageSource={stageContributorSource}
+        onStageSourceChange={setStageContributorSource}
+        stageShowCustomSource={stageContributorCustom}
+        onStageShowCustomSourceChange={setStageContributorCustom}
+        personFieldKey={contributorPersonFieldKey}
+        onAdd={addStagedContributor}
+        addDisabled={!stageContributorPerson || !stageContributorRole || isStagedContributorDuplicate}
+        addDisabledReason={isStagedContributorDuplicate ? "هذا الشخص مضاف بالفعل بهذا الدور" : undefined}
+        onRequestCreatePerson={(name) => { setPersonModalSlot("contributorStage"); setPersonModalName(name); }}
       />
 
       {/* منسوخ له (اختياري) */}
@@ -806,8 +810,9 @@ export function WorkForm({ volumeId, work, relationships, personMap, folioCount,
         onSaved={(person: Person) => {
           const selected = { person_id: person.id, preferred_name: person.preferred_name, written_form: person.preferred_name };
           if (personModalSlot === "author") setAuthor(selected);
-          else if (personModalSlot === "scribe") setScribe(selected);
-          else setCopiedFor(selected);
+          else if (personModalSlot === "copiedFor") setCopiedFor(selected);
+          else if (personModalSlot === "scribeStage") setStageScribePerson(selected);
+          else setStageContributorPerson(selected);
           setPersonModalSlot(null);
         }}
         onCancel={() => setPersonModalSlot(null)}

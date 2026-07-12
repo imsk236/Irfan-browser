@@ -253,7 +253,7 @@ export function PersonsScreen() {
                   </thead>
                   <tbody>
                     {appearances.map((a) => (
-                      <tr key={a.relationship_id}>
+                      <tr key={a.relationship_id ?? `${a.volume_id}-${a.work_id}`}>
                         <td>
                           <span className="serial-badge">{a.serial}</span>
                           {a.repository_volume_number != null && (

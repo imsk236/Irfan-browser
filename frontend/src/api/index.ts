@@ -3,7 +3,7 @@ import type {
   Repository, Volume, Work, Annotation, Person, PersonMatch,
   NameVariant, Relationship, TraceResult, Appearance,
   DashboardStats, ActivityCalendar, DayDetail, RecentEdit,
-  ActionableCounts, RepositoryCount, WilayaTraceResult,
+  ActionableCounts, RepositoryCount,
 } from "./types";
 
 // Repositories & Volumes
@@ -42,6 +42,7 @@ export const worksApi = {
     volume_id: number;
     title: string;
     title_source?: string;
+    part_number?: number;
     incipit?: string;
     explicit?: string;
     topic_category?: string;
@@ -120,12 +121,29 @@ export const relationshipsApi = {
   delete: (id: number) => api.delete(`/relationships/${id}`),
 };
 
-// Trace
+// Trace — unified البحث والتتبع search (ADR 0005)
 export const traceApi = {
-  trace: (personId: number) =>
-    api.get<TraceResult[]>(`/trace/${personId}`),
-  traceWilaya: (wilayaName: string) =>
-    api.get<WilayaTraceResult>(`/trace/wilaya?name=${encodeURIComponent(wilayaName)}`),
+  search: (filters: {
+    person_id?: number;
+    region?: string;
+    copy_place?: string;
+    title?: string;
+    number?: string;
+    repository_id?: number;
+    year_from?: number;
+    year_to?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters.person_id != null) params.set("person_id", String(filters.person_id));
+    if (filters.region) params.set("region", filters.region);
+    if (filters.copy_place) params.set("copy_place", filters.copy_place);
+    if (filters.title) params.set("title", filters.title);
+    if (filters.number) params.set("number", filters.number);
+    if (filters.repository_id != null) params.set("repository_id", String(filters.repository_id));
+    if (filters.year_from != null) params.set("year_from", String(filters.year_from));
+    if (filters.year_to != null) params.set("year_to", String(filters.year_to));
+    return api.get<TraceResult[]>(`/trace?${params.toString()}`);
+  },
 };
 
 // Vocab

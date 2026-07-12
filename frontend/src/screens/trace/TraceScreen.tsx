@@ -1,12 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { traceApi, volumesApi } from "../../api";
-import type { Repository, TraceResult, WilayaTraceResult } from "../../api/types";
+import { traceApi, volumesApi, personsApi, worksApi, relationshipsApi } from "../../api";
+import type { Repository, TraceResult, Person, Work, Relationship } from "../../api/types";
 import { PersonField } from "../../components/PersonField";
 import { VocabSelect } from "../../components/VocabSelect";
-import { ConfirmModal } from "../../components/ConfirmModal";
-import { WilayaResults } from "./WilayaResults";
-
-type Mode = "person" | "wilaya";
+import { WorkDetailModal } from "../../components/WorkDetailModal";
 
 interface SelectedPerson {
   person_id: number;
@@ -14,7 +11,18 @@ interface SelectedPerson {
   written_form: string;
 }
 
-const ROLE_ORDER = ["مؤلف", "ناسخ", "مالك", "مستعير", "واقف", "مقيّد", "مذكور"];
+interface Props {
+  onNavigateToVolume?: (volumeId: number) => void;
+}
+
+// Work-level fixed roles, then contributor_role vocab, then قيد role vocab (seed.py sort_order) — see ADR 0006.
+const ROLE_ORDER = [
+  "مؤلف", "مؤلف مشارك", "ناسخ", "كاتب", "منسوخ له",
+  "الراوي", "المترجم", "الجامع", "المرتب", "المعلق", "المستدرك", "المصحح",
+  "مالك", "شاري", "بائع", "واهب", "موهوب", "مُهْدِي", "مُهْدَى إليه",
+  "مُعير", "مستعير", "واقف", "موقوف", "ناظر", "ناظر الوقف", "دلال",
+  "مُطالِع", "مُعارض", "معروض عليه", "مُقابِل", "شاهد",
+];
 
 function sortRoles(roles: string[]): string[] {
   return [...roles].sort((a, b) => {
@@ -24,131 +32,111 @@ function sortRoles(roles: string[]): string[] {
   });
 }
 
-export function TraceScreen() {
-  // Mode
-  const [mode, setMode] = useState<Mode>("person");
-
-  // Person mode state
+export function TraceScreen({ onNavigateToVolume }: Props = {}) {
+  // Unified filter panel state (ADR 0005 — one search, every field optional and combinable)
   const [selectedPerson, setSelectedPerson] = useState<SelectedPerson | null>(null);
+  const [region, setRegion] = useState("");
+  const [copyPlace, setCopyPlace] = useState("");
+  const [title, setTitle] = useState("");
+  const [number, setNumber] = useState("");
+  const [repoFilter, setRepoFilter] = useState("");
+  const [yearFrom, setYearFrom] = useState("");
+  const [yearTo, setYearTo] = useState("");
+
   const [results, setResults] = useState<TraceResult[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [repos, setRepos] = useState<Repository[]>([]);
+  const [searchError, setSearchError] = useState("");
   const [activeRole, setActiveRole] = useState<string>("الكل");
-  const [repoFilter, setRepoFilter] = useState<string>("");
+  const [repos, setRepos] = useState<Repository[]>([]);
+  const [persons, setPersons] = useState<Person[]>([]);
 
-  // Wilaya mode state
-  const [selectedWilaya, setSelectedWilaya] = useState<string>("");
-  const [wilayaResults, setWilayaResults] = useState<WilayaTraceResult | null>(null);
-  const [wilayaLoading, setWilayaLoading] = useState(false);
-
-  // Export
-  const [showExport, setShowExport] = useState(false);
-  const [exportDir, setExportDir] = useState("");
-  const [exportConfirm, setExportConfirm] = useState<{
-    title: string;
-    message: string;
-    onConfirm: () => void;
-  } | null>(null);
+  // Result-detail modal (work-level rows only — see ADR 0005)
+  const [viewingWork, setViewingWork] = useState<{ work: Work; relationships: Relationship[] } | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const tabsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     volumesApi.listRepositories().then(setRepos).catch(() => {});
+    personsApi.list().then(setPersons).catch(() => {});
   }, []);
 
-  function switchMode(newMode: Mode) {
-    setMode(newMode);
-    if (newMode === "person") {
-      setSelectedWilaya("");
-      setWilayaResults(null);
-    } else {
-      setSelectedPerson(null);
-      setResults(null);
-      setActiveRole("الكل");
-      setRepoFilter("");
-    }
-  }
+  const personMap = new Map(persons.map((p) => [p.id, p.preferred_name]));
 
-  async function handlePersonSelect(person: SelectedPerson | null) {
-    setSelectedPerson(person);
-    setActiveRole("الكل");
-    setRepoFilter("");
-    if (!person) {
-      setResults(null);
-      return;
-    }
+  const hasAnyFilter =
+    selectedPerson !== null || region !== "" || copyPlace !== "" || title.trim() !== "" ||
+    number.trim() !== "" || repoFilter !== "" || yearFrom.trim() !== "" || yearTo.trim() !== "";
+
+  async function handleSearch() {
+    if (!hasAnyFilter) return;
     setLoading(true);
+    setSearchError("");
+    setActiveRole("الكل");
     try {
-      setResults(await traceApi.trace(person.person_id));
-    } catch {
-      setResults([]);
+      const filters: Parameters<typeof traceApi.search>[0] = {};
+      if (selectedPerson) filters.person_id = selectedPerson.person_id;
+      if (region) filters.region = region;
+      if (copyPlace) filters.copy_place = copyPlace;
+      if (title.trim()) filters.title = title.trim();
+      if (number.trim()) filters.number = number.trim();
+      if (repoFilter) filters.repository_id = Number(repoFilter);
+      if (yearFrom.trim()) filters.year_from = Number(yearFrom.trim());
+      if (yearTo.trim()) filters.year_to = Number(yearTo.trim());
+      setResults(await traceApi.search(filters));
+    } catch (err) {
+      console.error(err);
+      // client.ts surfaces the server's Arabic `detail` as Error.message
+      setSearchError(
+        err instanceof Error && err.message ? err.message : "تعذّر إجراء البحث. حاول مرة أخرى."
+      );
+      setResults(null);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleWilayaSelect(wilaya: string) {
-    setSelectedWilaya(wilaya);
-    if (!wilaya) {
-      setWilayaResults(null);
-      return;
-    }
-    setWilayaLoading(true);
-    try {
-      setWilayaResults(await traceApi.traceWilaya(wilaya));
-    } catch {
-      setWilayaResults({ scholars: [], copies: [], repositories: [] });
-    } finally {
-      setWilayaLoading(false);
+  function handleSearchKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void handleSearch();
     }
   }
 
-  function handleScholarClick(personId: number, preferredName: string) {
-    switchMode("person");
-    void handlePersonSelect({ person_id: personId, preferred_name: preferredName, written_form: preferredName });
+  async function handleRowClick(row: TraceResult) {
+    if (row.work_id != null) {
+      setModalLoading(true);
+      try {
+        const [work, relationships] = await Promise.all([
+          worksApi.get(row.work_id),
+          relationshipsApi.listForVolume(row.volume_id),
+        ]);
+        setViewingWork({ work, relationships });
+      } catch {
+        // work fetch failed — fall back to opening the volume itself
+        onNavigateToVolume?.(row.volume_id);
+      } finally {
+        setModalLoading(false);
+      }
+    } else {
+      onNavigateToVolume?.(row.volume_id);
+    }
   }
 
-  // Derive unique roles from results
+  function handleWorkModalEdit() {
+    if (viewingWork) onNavigateToVolume?.(viewingWork.work.volume_id);
+    setViewingWork(null);
+  }
+
+  // Derive unique roles from results (placeholder rows have role=null and only show under "الكل")
   const allRoles = results
-    ? sortRoles([...new Set(results.map((r) => r.role))])
+    ? sortRoles([...new Set(results.map((r) => r.role).filter((r): r is string => r != null))])
     : [];
 
-  // Client-side filtering
-  const filtered = (results ?? []).filter((r) => {
-    const roleOk = activeRole === "الكل" || r.role === activeRole;
-    const repoOk =
-      !repoFilter ||
-      (() => {
-        const repo = repos.find((rep) => rep.id.toString() === repoFilter);
-        return repo ? r.serial.startsWith(repo.place_key) : true;
-      })();
-    return roleOk && repoOk;
-  });
+  const filtered = (results ?? []).filter((r) => activeRole === "الكل" || r.role === activeRole);
 
   function countForRole(role: string) {
     if (!results) return 0;
-    return results.filter((r) => {
-      const repoOk =
-        !repoFilter ||
-        (() => {
-          const repo = repos.find((rep) => rep.id.toString() === repoFilter);
-          return repo ? r.serial.startsWith(repo.place_key) : true;
-        })();
-      return r.role === role && repoOk;
-    }).length;
-  }
-
-  function totalCount() {
-    if (!results) return 0;
-    return results.filter((r) => {
-      const repoOk =
-        !repoFilter ||
-        (() => {
-          const repo = repos.find((rep) => rep.id.toString() === repoFilter);
-          return repo ? r.serial.startsWith(repo.place_key) : true;
-        })();
-      return repoOk;
-    }).length;
+    return results.filter((r) => r.role === role).length;
   }
 
   function handleTabKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, tabIndex: number) {
@@ -168,34 +156,6 @@ export function TraceScreen() {
     }
   }
 
-  async function runExport(format: "csv" | "json") {
-    if (!exportDir.trim()) return;
-    try {
-      const { exportApi } = await import("../../api");
-      if (format === "csv") {
-        const r = await exportApi.csv(exportDir.trim());
-        setExportConfirm({
-          title: "تم التصدير",
-          message: `تم تصدير ${r.files.length} ملف إلى: ${exportDir}`,
-          onConfirm: () => setExportConfirm(null),
-        });
-      } else {
-        const r = await exportApi.json(exportDir.trim());
-        setExportConfirm({
-          title: "تم التصدير",
-          message: `تم حفظ الملف: ${r.file}`,
-          onConfirm: () => setExportConfirm(null),
-        });
-      }
-    } catch (err) {
-      setExportConfirm({
-        title: "خطأ في التصدير",
-        message: String(err),
-        onConfirm: () => setExportConfirm(null),
-      });
-    }
-  }
-
   const tabs = ["الكل", ...allRoles];
 
   return (
@@ -209,273 +169,233 @@ export function TraceScreen() {
         }}
       >
         {/* Title row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
-          <div style={{ flexShrink: 0, position: "relative" }}>
-            <button
-              className="btn btn-secondary btn-compact"
-              onClick={() => setShowExport(!showExport)}
-            >
-              {showExport ? "إخفاء التصدير" : "تصدير الأرشيف"}
-            </button>
-            {showExport && (
-              <div
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  top: "calc(100% + var(--space-2))",
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius)",
-                  padding: "var(--space-4)",
-                  boxShadow: "var(--shadow-dropdown)",
-                  zIndex: 10,
-                  minWidth: 320,
-                }}
-              >
-                <div className="field" style={{ marginBottom: "var(--space-3)" }}>
-                  <label>مسار مجلد الحفظ</label>
-                  <input
-                    className="input"
-                    type="text"
-                    value={exportDir}
-                    onChange={(e) => setExportDir(e.target.value)}
-                    placeholder="/path/to/output"
-                    dir="ltr"
-                    style={{ textAlign: "left" }}
-                  />
-                </div>
-                <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                  <button className="btn btn-secondary btn-compact" disabled={!exportDir.trim()} onClick={() => runExport("csv")}>CSV</button>
-                  <button className="btn btn-secondary btn-compact" disabled={!exportDir.trim()} onClick={() => runExport("json")}>JSON</button>
-                  <button className="btn btn-secondary btn-compact" onClick={() => setShowExport(false)}>إغلاق</button>
-                </div>
-              </div>
-            )}
-          </div>
-
+        <div style={{ marginBottom: "var(--space-4)" }}>
           <h1 style={{ fontSize: 18 }}>البحث والتتبع</h1>
         </div>
 
-        {/* Mode toggle + search field */}
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--space-3)", maxWidth: 560 }}>
-          {/* Mode segmented control */}
-          <div
-            style={{
-              display: "flex",
-              flexShrink: 0,
-              border: "1px solid var(--color-border-strong)",
-              borderRadius: "var(--radius-md)",
-              overflow: "hidden",
-            }}
-          >
-            <button
-              className={`btn ${mode === "person" ? "btn-primary" : "btn-secondary"}`}
-              style={{ borderRadius: 0, border: "none", borderRight: "1px solid var(--color-border-strong)", height: 40, fontSize: 13 }}
-              onClick={() => switchMode("person")}
-              aria-pressed={mode === "person"}
-            >
-              بحث عن عالم
-            </button>
-            <button
-              className={`btn ${mode === "wilaya" ? "btn-primary" : "btn-secondary"}`}
-              style={{ borderRadius: 0, border: "none", height: 40, fontSize: 13 }}
-              onClick={() => switchMode("wilaya")}
-              aria-pressed={mode === "wilaya"}
-            >
-              بحث عن ولاية
-            </button>
+        {/* Unified filter panel — one search, every field optional and combinable (ADR 0005) */}
+        <div onKeyDown={handleSearchKeyDown} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          {/* Row 1 — primary search terms */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+            <PersonField label="شخص" value={selectedPerson} onChange={setSelectedPerson} />
+            <div className="field">
+              <label htmlFor="trace-title" style={{ fontSize: 13, fontWeight: 500 }}>العنوان</label>
+              <input
+                id="trace-title"
+                className="input"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="ابحث بعنوان العنوان…"
+              />
+            </div>
           </div>
 
-          {/* Search field */}
-          <div style={{ flex: 1 }}>
-            {mode === "person" ? (
-              <PersonField
-                label="ابحث عن عالم"
-                value={selectedPerson}
-                onChange={handlePersonSelect}
+          {/* Row 2 — narrowing filters + search action */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.3fr 1.3fr 1.3fr 1fr 84px 84px auto",
+              gap: "var(--space-3)",
+              alignItems: "flex-end",
+            }}
+          >
+            <div className="field">
+              <label htmlFor="trace-region" style={{ fontSize: 13, fontWeight: 500 }}>منطقة العالم</label>
+              <VocabSelect id="trace-region" category="wilaya" value={region} onChange={setRegion} placeholder="أي منطقة" />
+            </div>
+            <div className="field">
+              <label htmlFor="trace-copy-place" style={{ fontSize: 13, fontWeight: 500 }}>مكان النسخ</label>
+              <VocabSelect id="trace-copy-place" category="wilaya" value={copyPlace} onChange={setCopyPlace} placeholder="أي مكان" />
+            </div>
+            <div className="field">
+              <label htmlFor="trace-repo" style={{ fontSize: 13, fontWeight: 500 }}>الخزانة</label>
+              <select id="trace-repo" className="select" value={repoFilter} onChange={(e) => setRepoFilter(e.target.value)}>
+                <option value="">كل الخزائن</option>
+                {repos.map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="trace-number" style={{ fontSize: 13, fontWeight: 500 }}>الرقم</label>
+              <input
+                id="trace-number"
+                className="input"
+                type="text"
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+                placeholder="التسلسلي أو رقم المجلد"
               />
-            ) : (
-              <div className="field">
-                <label style={{ fontSize: 13, fontWeight: 500 }}>اختر ولاية</label>
-                <VocabSelect
-                  category="wilaya"
-                  value={selectedWilaya}
-                  onChange={handleWilayaSelect}
-                  placeholder="اختر ولاية…"
-                />
-              </div>
-            )}
+            </div>
+            <div className="field">
+              <label htmlFor="trace-year-from" style={{ fontSize: 13, fontWeight: 500 }}>سنة من</label>
+              <input
+                id="trace-year-from"
+                className="input"
+                type="number"
+                dir="ltr"
+                style={{ textAlign: "left" }}
+                value={yearFrom}
+                onChange={(e) => setYearFrom(e.target.value)}
+                placeholder="١٢٠٠"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="trace-year-to" style={{ fontSize: 13, fontWeight: 500 }}>سنة إلى</label>
+              <input
+                id="trace-year-to"
+                className="input"
+                type="number"
+                dir="ltr"
+                style={{ textAlign: "left" }}
+                value={yearTo}
+                onChange={(e) => setYearTo(e.target.value)}
+                placeholder="١٣٠٠"
+              />
+            </div>
+            <button
+              className="btn btn-primary"
+              disabled={!hasAnyFilter || loading}
+              onClick={() => void handleSearch()}
+            >
+              بحث
+            </button>
           </div>
         </div>
       </div>
 
       {/* Results area */}
       <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-5)" }}>
+        {loading && (
+          <p style={{ color: "var(--color-text-muted)" }}>جارٍ البحث…</p>
+        )}
 
-        {/* ── Person mode ── */}
-        {mode === "person" && (
+        {searchError && !loading && (
+          <p style={{ color: "var(--color-danger)" }}>{searchError}</p>
+        )}
+
+        {!loading && !searchError && results && results.length === 0 && (
+          <p className="empty-state">لا توجد نتائج مطابقة.</p>
+        )}
+
+        {!loading && !searchError && results && results.length > 0 && (
           <>
-            {loading && (
-              <p style={{ color: "var(--color-text-muted)" }}>جارٍ البحث…</p>
-            )}
+            <div style={{ marginBottom: "var(--space-4)" }}>
+              <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+                {filtered.length} نتيجة
+              </span>
+            </div>
 
-            {results && !loading && results.length === 0 && (
-              <p style={{ color: "var(--color-text-muted)" }}>
-                لا توجد مخطوطات مرتبطة بهذا العالم.
+            <div ref={tabsRef} role="tablist" aria-label="التصفية حسب الدور" className="role-tabs">
+              {tabs.map((tab, idx) => {
+                const count = tab === "الكل" ? results.length : countForRole(tab);
+                return (
+                  <button
+                    key={tab}
+                    role="tab"
+                    aria-selected={activeRole === tab}
+                    className={`role-tab ${activeRole === tab ? "active" : ""}`}
+                    onClick={() => setActiveRole(tab)}
+                    onKeyDown={(e) => handleTabKeyDown(e, idx)}
+                    tabIndex={activeRole === tab ? 0 : -1}
+                  >
+                    {tab}
+                    <span style={{ fontSize: 11, color: "var(--color-text-muted)", marginRight: 4 }}>
+                      ({count})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {filtered.length === 0 ? (
+              <p style={{ fontSize: 14, color: "var(--color-text-muted)", padding: "var(--space-4) 0" }}>
+                لا توجد نتائج لهذا الفلتر.
               </p>
-            )}
-
-            {results && !loading && results.length > 0 && (
-              <>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "var(--space-4)",
-                    flexWrap: "wrap",
-                    gap: "var(--space-3)",
-                  }}
-                >
-                  <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-                    {totalCount()} نتيجة
-                    {selectedPerson && ` لـ ${selectedPerson.preferred_name}`}
-                  </span>
-
-                  {repos.length > 0 && (
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                      <label style={{ fontSize: 13, color: "var(--color-text-muted)" }} htmlFor="repo-filter">
-                        الخزانة:
-                      </label>
-                      <select
-                        id="repo-filter"
-                        className="select"
-                        style={{ width: "auto", height: 34, fontSize: 13 }}
-                        value={repoFilter}
-                        onChange={(e) => setRepoFilter(e.target.value)}
+            ) : (
+              <table className="data-table" style={{ tableLayout: "fixed" }}>
+                <colgroup>
+                  <col style={{ width: "15%" }} />
+                  <col style={{ width: "13%" }} />
+                  <col style={{ width: "20%" }} />
+                  <col style={{ width: "37%" }} />
+                  <col style={{ width: "15%" }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>الرمز</th>
+                    <th>الدور</th>
+                    <th>العنوان</th>
+                    <th>نص الدليل</th>
+                    <th>مصدر الصلة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((r) => (
+                    <tr
+                      key={r.relationship_id ?? `ph-${r.volume_id}-${r.work_id}`}
+                      onClick={() => void handleRowClick(r)}
+                      style={{ cursor: "pointer", background: r.relationship_id == null ? "var(--color-surface-muted)" : undefined }}
+                    >
+                      <td>
+                        <span className="serial-badge">{r.serial}</span>
+                        {r.repository_volume_number != null && (
+                          <span style={{ fontSize: 12, color: "var(--color-text-muted)", marginRight: 4 }}>
+                            ({r.repository_volume_number})
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        {r.role ?? (
+                          <span style={{
+                            fontSize: 11, fontWeight: 600, color: "var(--color-warning)",
+                            background: "rgba(160, 113, 30, 0.10)", borderRadius: 999, padding: "2px 9px",
+                          }}>
+                            لا توجد علاقة مسجلة
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.work_title ?? "—"}
+                      </td>
+                      <td
+                        style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        title={r.evidence_text ?? ""}
                       >
-                        <option value="">الكل</option>
-                        {repos.map((r) => (
-                          <option key={r.id} value={r.id}>{r.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                <div ref={tabsRef} role="tablist" aria-label="التصفية حسب الدور" className="role-tabs">
-                  {tabs.map((tab, idx) => {
-                    const count = tab === "الكل" ? totalCount() : countForRole(tab);
-                    return (
-                      <button
-                        key={tab}
-                        role="tab"
-                        aria-selected={activeRole === tab}
-                        className={`role-tab ${activeRole === tab ? "active" : ""}`}
-                        onClick={() => setActiveRole(tab)}
-                        onKeyDown={(e) => handleTabKeyDown(e, idx)}
-                        tabIndex={activeRole === tab ? 0 : -1}
-                      >
-                        {tab}
-                        <span style={{ fontSize: 11, color: "var(--color-text-muted)", marginRight: 4 }}>
-                          ({count})
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {filtered.length === 0 ? (
-                  <p style={{ fontSize: 14, color: "var(--color-text-muted)", padding: "var(--space-4) 0" }}>
-                    لا توجد نتائج لهذا الفلتر.
-                  </p>
-                ) : (
-                  <table className="data-table" style={{ tableLayout: "fixed" }}>
-                    <colgroup>
-                      <col style={{ width: "15%" }} />
-                      <col style={{ width: "13%" }} />
-                      <col style={{ width: "20%" }} />
-                      <col style={{ width: "37%" }} />
-                      <col style={{ width: "15%" }} />
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        <th>الرمز</th>
-                        <th>الدور</th>
-                        <th>العنوان</th>
-                        <th>نص الدليل</th>
-                        <th>مصدر الصلة</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map((r) => (
-                        <tr key={r.relationship_id}>
-                          <td>
-                            <span className="serial-badge">{r.serial}</span>
-                            {r.repository_volume_number != null && (
-                              <span style={{ fontSize: 12, color: "var(--color-text-muted)", marginRight: 4 }}>
-                                ({r.repository_volume_number})
-                              </span>
-                            )}
-                          </td>
-                          <td>{r.role}</td>
-                          <td style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {r.work_title ?? "—"}
-                          </td>
-                          <td
-                            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                            title={r.evidence_text ?? ""}
-                          >
-                            {r.evidence_text ? `«${r.evidence_text}»` : "—"}
-                          </td>
-                          <td style={{ color: "var(--color-text-muted)" }}>
-                            {r.evidence_source ?? "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </>
-            )}
-
-            {!selectedPerson && !loading && (
-              <p className="empty-state">ابحث عن عالم لعرض مواضع ظهوره في الأرشيف</p>
+                        {r.evidence_text ? `«${r.evidence_text}»` : "—"}
+                      </td>
+                      <td style={{ color: "var(--color-text-muted)" }}>
+                        {r.evidence_source ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </>
         )}
 
-        {/* ── Wilaya mode ── */}
-        {mode === "wilaya" && (
-          <>
-            {wilayaLoading && (
-              <p style={{ color: "var(--color-text-muted)" }}>جارٍ البحث…</p>
-            )}
-
-            {wilayaResults && !wilayaLoading && (
-              <WilayaResults
-                key={selectedWilaya}
-                wilaya={selectedWilaya}
-                results={wilayaResults}
-                onScholarClick={handleScholarClick}
-              />
-            )}
-
-            {!selectedWilaya && !wilayaLoading && (
-              <p className="empty-state">اختر ولاية لعرض ما يرتبط بها من علماء ونسخ وخزائن</p>
-            )}
-          </>
+        {!results && !loading && !searchError && (
+          <p className="empty-state">
+            ابحث بشخص، منطقة، عنوان، رقم، خزانة، أو سنة النسخ — يمكن الجمع بين أكثر من معيار
+          </p>
         )}
       </div>
 
-      {exportConfirm && (
-        <ConfirmModal
-          title={exportConfirm.title}
-          message={exportConfirm.message}
-          confirmLabel="حسناً"
-          cancelLabel="إغلاق"
-          onConfirm={exportConfirm.onConfirm}
-          onCancel={() => setExportConfirm(null)}
+      {modalLoading && (
+        <div className="modal-backdrop">
+          <p style={{ color: "#fff" }}>جارٍ التحميل…</p>
+        </div>
+      )}
+
+      {viewingWork && (
+        <WorkDetailModal
+          work={viewingWork.work}
+          relationships={viewingWork.relationships}
+          personMap={personMap}
+          onEdit={handleWorkModalEdit}
+          onClose={() => setViewingWork(null)}
         />
       )}
     </div>

@@ -37,6 +37,12 @@ declare global {
 export function App() {
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [ready, setReady] = useState(false);
+  const [pendingVolumeId, setPendingVolumeId] = useState<number | null>(null);
+
+  function navigate(target: Screen, volumeId?: number) {
+    setScreen(target);
+    if (volumeId != null) setPendingVolumeId(volumeId);
+  }
 
   useEffect(() => {
     async function init() {
@@ -88,10 +94,17 @@ export function App() {
         }}
         role="main"
       >
-        <div style={{ display: screen === "dashboard" ? "contents" : "none" }}><DashboardScreen onNavigate={setScreen} /></div>
-        <div style={{ display: screen === "volumes"   ? "contents" : "none" }}><VolumesScreen /></div>
+        <div style={{ display: screen === "dashboard" ? "contents" : "none" }}><DashboardScreen onNavigate={navigate} /></div>
+        <div style={{ display: screen === "volumes"   ? "contents" : "none" }}>
+          <VolumesScreen
+            pendingVolumeId={pendingVolumeId}
+            onPendingVolumeConsumed={() => setPendingVolumeId(null)}
+          />
+        </div>
         <div style={{ display: screen === "persons"   ? "contents" : "none" }}><PersonsScreen /></div>
-        <div style={{ display: screen === "trace"     ? "contents" : "none" }}><TraceScreen /></div>
+        <div style={{ display: screen === "trace"     ? "contents" : "none" }}>
+          <TraceScreen onNavigateToVolume={(volumeId) => navigate("volumes", volumeId)} />
+        </div>
         <div style={{ display: screen === "settings"  ? "contents" : "none" }}><SettingsScreen /></div>
       </main>
     </div>
