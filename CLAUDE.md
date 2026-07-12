@@ -68,7 +68,7 @@ Migration files live in `backend/migrations/versions/`. Follow the established p
 - Always use `op.batch_alter_table()` in `downgrade()` (SQLite requires it for column drops)
 - All new columns must be `nullable=True` (SQLite can't ADD COLUMN NOT NULL without DEFAULT)
 
-Current chain: `001_baseline` → `002_person_biographical_fields` → `003_add_repository_volume_number` → `004_repository_location_drop_kind` → `005_volume_drop_library_shelfmark` → `006_work_copy_date_drop_type` → `007_annotation_drop_date_fields` → `008_person_wilayas_nasab`
+Current chain: `001_baseline` → `002_person_biographical_fields` → `003_add_repository_volume_number` → `004_repository_location_drop_kind` → `005_volume_drop_library_shelfmark` → `006_work_copy_date_drop_type` → `007_annotation_drop_date_fields` → `008_person_wilayas_nasab` → `009_activity_log` → `010_drop_confidence` → `011_work_incipit_explicit_title_source` → `012_work_topic_classification` → `013_work_copy_place` → `014_annotation_date` → `015_work_part_number`
 
 ## Backend patterns
 
@@ -138,6 +138,15 @@ Pushing a `v*.*.*` git tag triggers `.github/workflows/release.yml` (GitHub Acti
 4. Publishes the installer + `latest.yml` to GitHub Releases
 
 The `GH_TOKEN` secret (repo scope) must exist in the repo's Actions secrets for publishing to work.
+
+### Packaging locally
+
+```bash
+npm run package          # rebuilds backend.exe (PyInstaller) + frontend + electron, then NSIS installer
+npm run package:backend  # backend.exe only, into electron/resources/backend/
+```
+
+`package` always runs `package:backend` first. This matters: `electron/resources/backend/` is gitignored and electron-builder blindly copies whatever `backend.exe` is sitting there — before this step existed, local packages silently shipped a stale backend. Never invoke `electron-builder` directly without first rebuilding the backend. `uv run --group build` pulls in the `build` dependency group (PyInstaller) automatically; no separate `uv sync` needed.
 
 ### Shipping a new version
 
@@ -224,5 +233,5 @@ Never commit: `dev_archive.db`, `archive.db`, `Tempshots/`, `.env`, `node_module
 - **Serial** — `PPPP-DDDD` format, auto-generated from `repository.place_key` + `volume.document_number`. Never hand-typed. Components editable; serial regenerates automatically.
 - **رقم المجلد في الخزانة** — optional integer, the volume's number within the physical repository (`repository_volume_number` in DB), manually entered and separate from the serial.
 - **Relationships** link persons to volumes or works via roles (مؤلف، ناسخ، مالك، مستعير، واقف، مقيّد، مذكور). The `level` field is `"volume"` or `"work"`.
-- **Annotations (قيود)** are physical inscriptions on a manuscript — ownership marks, reading certificates, etc. They can be linked to a specific work within a volume. Dates are **not** tracked on قيود.
+- **Annotations (قيود)** are physical inscriptions on a manuscript — ownership marks, reading certificates, etc. They can be linked to a specific work within a volume. تاريخ القيد (a structured Hijri date, mirroring تاريخ النسخ's five components) is tracked on annotations — see `docs/adr/0003-reinstate-annotation-dates.md`.
 - **person_wilayas** — junction table linking a person to one or more Omani wilayas. Sentinel values: `"مجهول"` (unknown) and `"خارج عُمان"` (outside Oman).
