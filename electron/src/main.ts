@@ -48,49 +48,6 @@ function copyDbFile(fromPath: string, toPath: string): void {
 }
 
 /**
- * Bounded search for an existing archive.db elsewhere on the same drive as
- * `exclude`, starting from the drive root. Guards against picking a different
- * folder than a previous device used, which would otherwise silently create
- * a second, diverging database on the same drive. Depth- and entry-limited
- * so it can't hang on a large external drive full of unrelated files.
- */
-function findExistingArchiveDb(
-  root: string,
-  exclude: string,
-  maxDepth = 4,
-  maxEntries = 20000
-): string | null {
-  const excludeNorm = path.normalize(exclude);
-  let visited = 0;
-
-  function walk(dir: string, depth: number): string | null {
-    if (depth > maxDepth) return null;
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return null;
-    }
-    for (const entry of entries) {
-      if (visited++ > maxEntries) return null;
-      if (entry.isSymbolicLink()) continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isFile() && entry.name === "archive.db") {
-        if (path.normalize(full) !== excludeNorm) return full;
-        continue;
-      }
-      if (entry.isDirectory() && !entry.name.startsWith(".")) {
-        const found = walk(full, depth + 1);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-
-  return walk(root, 0);
-}
-
-/**
  * Applies a pending relocation requested via Settings, before this session's
  * dbPath is resolved. If the target already has an archive.db (the drive was
  * already set up from another device), adopt it as-is rather than overwrite.
@@ -110,9 +67,10 @@ function applyPendingRelocation(config: AppConfig, defaultDbPath: string): AppCo
     writeConfig(next);
     return next;
   } catch (err) {
+    console.error("[db] relocation failed:", err);
     dialog.showErrorBox(
       "تعذّر نقل قاعدة البيانات",
-      `لم يتمكن البرنامج من نقل قاعدة البيانات إلى الموقع الجديد. سيستمر استخدام الموقع السابق.\n\n${String(err)}`
+      "لم يتمكن البرنامج من نقل قاعدة البيانات إلى الموقع الجديد. سيستمر استخدام الموقع السابق."
     );
     const next: AppConfig = { dbPath: config.dbPath };
     writeConfig(next);
@@ -122,25 +80,18 @@ function applyPendingRelocation(config: AppConfig, defaultDbPath: string): AppCo
 
 /**
  * Resolves which db path to use this session. If a custom path is configured
- * but its drive/folder isn't currently reachable, asks the user rather than
- * silently falling back and creating a second, diverging database.
+ * but its drive/folder isn't currently reachable (e.g. an external drive is
+ * unplugged), falls back to the default path for this session only — the
+ * config is left untouched so the custom path is retried on the next launch.
  */
-function resolveDbPath(config: AppConfig, defaultDbPath: string): string | null {
+function resolveDbPath(config: AppConfig, defaultDbPath: string): string {
   if (!config.dbPath) return defaultDbPath;
 
-  while (!fs.existsSync(path.dirname(config.dbPath))) {
-    const choice = dialog.showMessageBoxSync({
-      type: "warning",
-      title: "قاعدة البيانات غير موجودة",
-      message: "تعذّر الوصول إلى موقع قاعدة البيانات المخصَّص.",
-      detail: `تأكد من توصيل القرص الخارجي ثم أعد المحاولة.\n\nالموقع: ${config.dbPath}`,
-      buttons: ["إعادة المحاولة", "استخدام الموقع الافتراضي مؤقتاً", "إغلاق البرنامج"],
-      defaultId: 0,
-      cancelId: 2,
-    });
-    if (choice === 1) return defaultDbPath;
-    if (choice === 2) return null;
-    // choice === 0: loop and re-check
+  if (!fs.existsSync(path.dirname(config.dbPath))) {
+    console.warn(
+      `[db] configured location unreachable, falling back to default: ${config.dbPath}`
+    );
+    return defaultDbPath;
   }
   return config.dbPath;
 }
@@ -285,11 +236,6 @@ ipcMain.handle("db:choose-location", async () => {
     return { status: "adopt", path: target };
   }
 
-  const foundElsewhere = findExistingArchiveDb(path.parse(folder).root, target);
-  if (foundElsewhere) {
-    return { status: "conflict", path: target, foundPath: foundElsewhere };
-  }
-
   return { status: "new", path: target };
 });
 
@@ -344,12 +290,7 @@ app.whenReady().then(async () => {
   let config = readConfig();
   config = applyPendingRelocation(config, defaultDbPath);
 
-  const resolvedDbPath = resolveDbPath(config, defaultDbPath);
-  if (resolvedDbPath === null) {
-    app.quit();
-    return;
-  }
-  const dbPath = resolvedDbPath;
+  const dbPath = resolveDbPath(config, defaultDbPath);
   currentDbPath = dbPath;
 
   // On first launch in production, copy the bundled seed database to userData.
@@ -388,7 +329,8 @@ app.whenReady().then(async () => {
         return;
       }
     } else {
-      dialog.showErrorBox("فشل تشغيل الخدمة الخلفية", String(err));
+      console.error("[backend] failed to start:", err);
+      dialog.showErrorBox("فشل تشغيل البرنامج", "تعذّر تشغيل الخدمة الخلفية. أعد تشغيل البرنامج، وإذا تكررت المشكلة تواصل مع الدعم الفني.");
       app.quit();
       return;
     }
@@ -407,7 +349,7 @@ app.whenReady().then(async () => {
 
     autoUpdater.on("update-not-available", (info) => {
       console.log("[updater] up to date, current:", app.getVersion(), "latest:", info.version);
-      dialog.showMessageBox({ type: "info", title: "التحديث", message: `النسخة الحالية (${app.getVersion()}) هي الأحدث.`, detail: `أحدث إصدار على GitHub: ${info.version}`, buttons: ["حسناً"] });
+      dialog.showMessageBox({ type: "info", title: "التحديث", message: "البرنامج محدَّث.", buttons: ["حسناً"] });
     });
 
     autoUpdater.on("download-progress", (progress) => {
@@ -421,7 +363,7 @@ app.whenReady().then(async () => {
 
     autoUpdater.on("error", (err) => {
       console.error("[updater] error:", err.message, err.stack);
-      dialog.showErrorBox("خطأ في التحديث", err.message);
+      dialog.showErrorBox("خطأ في التحديث", "تعذّر التحقق من وجود تحديث أو تنزيله. حاول لاحقاً.");
     });
 
     // Check 3 seconds after launch so the window is visible first

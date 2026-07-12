@@ -10,9 +10,7 @@ contextBridge.exposeInMainWorld("archive", {
   getDbPath: (): Promise<string> => ipcRenderer.invoke("db:get-path"),
 
   chooseDbLocation: (): Promise<
-    | { status: "unchanged" | "adopt" | "new"; path: string }
-    | { status: "conflict"; path: string; foundPath: string }
-    | null
+    { status: "unchanged" | "adopt" | "new"; path: string } | null
   > => ipcRenderer.invoke("db:choose-location"),
 
   confirmDbLocation: (targetPath: string): Promise<void> =>

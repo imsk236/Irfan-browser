@@ -29,13 +29,30 @@ def get_engine():
     return _engine
 
 
+def _backup_before_migration():
+    """Copy the db file (+ WAL/SHM sidecars) to a single overwritten backup
+    right before running migrations, so a failed/bad migration is always
+    recoverable from the state immediately prior. See ADR 0008."""
+    import shutil
+
+    db_path = os.environ.get("DB_PATH", "archive.db")
+    if not os.path.exists(db_path):
+        return
+    for suffix in ("", "-wal", "-shm"):
+        src = db_path + suffix
+        if os.path.exists(src):
+            shutil.copyfile(src, db_path + suffix + ".bak-before-migration")
+
+
 def init_db():
-    """Apply all Alembic migrations, set WAL mode, and run seed data."""
+    """Back up the db, apply all Alembic migrations, set WAL mode, and run seed data."""
     import os
     import sys
 
     from alembic.config import Config as AlembicConfig
     from alembic import command as alembic_command
+
+    _backup_before_migration()
 
     if getattr(sys, "frozen", False):
         # PyInstaller bundle: alembic.ini and migrations/ are bundled as datas

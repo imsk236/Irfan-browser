@@ -18,9 +18,7 @@ declare global {
       savePdf: () => Promise<string | null>;
       getDbPath?: () => Promise<string>;
       chooseDbLocation?: () => Promise<
-        | { status: "unchanged" | "adopt" | "new"; path: string }
-        | { status: "conflict"; path: string; foundPath: string }
-        | null
+        { status: "unchanged" | "adopt" | "new"; path: string } | null
       >;
       confirmDbLocation?: (targetPath: string) => Promise<void>;
       restartApp?: () => Promise<void>;
