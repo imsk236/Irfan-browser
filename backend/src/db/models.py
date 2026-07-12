@@ -113,6 +113,7 @@ class Work(Base):
     volume_id = Column(Integer, ForeignKey("volumes.id"), nullable=False)
     title = Column(Text, nullable=False)
     title_source = Column(Text)
+    part_number = Column(Integer)          # الأجزاء — this title's part number within a multi-part work
     incipit = Column(Text)
     explicit = Column(Text)
     start_unit = Column(Text)

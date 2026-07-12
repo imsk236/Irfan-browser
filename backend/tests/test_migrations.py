@@ -99,7 +99,7 @@ def test_upgrade_version_is_head(temp_db):
     engine.dispose()
 
     assert len(version) == 1
-    assert version[0][0] == "014_annotation_date"
+    assert version[0][0] == "015_work_part_number"
 
 
 def test_stamp_existing_db_then_upgrade(temp_db):
@@ -117,7 +117,7 @@ def test_stamp_existing_db_then_upgrade(temp_db):
     with engine.connect() as conn:
         version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
     engine.dispose()
-    assert version == "014_annotation_date"
+    assert version == "015_work_part_number"
 
 
 def test_upgrade_head_on_create_all_db_without_stamp(temp_db):
@@ -139,7 +139,7 @@ def test_upgrade_head_on_create_all_db_without_stamp(temp_db):
         cols = {r[1] for r in conn.execute(text("PRAGMA table_info(persons)")).fetchall()}
     engine.dispose()
 
-    assert version == "014_annotation_date"
+    assert version == "015_work_part_number"
     assert "nasab" in cols
 
 

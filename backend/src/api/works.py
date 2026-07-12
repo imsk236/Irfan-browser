@@ -11,6 +11,7 @@ class WorkCreate(BaseModel):
     volume_id: int
     title: str
     title_source: str | None = None
+    part_number: int | None = None
     incipit: str | None = None
     explicit: str | None = None
     topic_category: str | None = None
@@ -30,6 +31,7 @@ class WorkCreate(BaseModel):
 class WorkUpdate(BaseModel):
     title: str | None = None
     title_source: str | None = None
+    part_number: int | None = None
     incipit: str | None = None
     explicit: str | None = None
     topic_category: str | None = None
@@ -51,6 +53,7 @@ class WorkOut(BaseModel):
     volume_id: int
     title: str
     title_source: str | None
+    part_number: int | None
     incipit: str | None
     explicit: str | None
     topic_category: str | None
@@ -78,6 +81,7 @@ def create_work(body: WorkCreate):
                 volume_id=body.volume_id,
                 title=body.title,
                 title_source=body.title_source,
+                part_number=body.part_number,
                 incipit=body.incipit,
                 explicit=body.explicit,
                 topic_category=body.topic_category,
