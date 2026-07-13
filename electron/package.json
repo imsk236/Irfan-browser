@@ -2,6 +2,7 @@
   "name": "irfan-electron",
   "version": "0.4.1",
   "private": true,
+  "license": "UNLICENSED",
   "main": "dist/main.js",
   "scripts": {
     "build": "node build.mjs",

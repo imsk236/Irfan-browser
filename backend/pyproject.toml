@@ -2,6 +2,7 @@
 name = "backend"
 version = "0.1.0"
 description = "Add your description here"
+license = "LicenseRef-Proprietary"
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.13.0",

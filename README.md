@@ -32,3 +32,7 @@ uv run pytest
 ## Status
 
 Personal project, actively maintained.
+
+## License
+
+All rights reserved. See [LICENSE](LICENSE).
